@@ -16,7 +16,7 @@ const chunksFromDeps = (deps, vendorDeps) => {
     return chunks
 }
 
-const serverPort = 8085
+const serverPort = 5000
 const clientPort = 8082
 const previewPort = 8083
 
@@ -40,7 +40,7 @@ export default defineConfig({
     root: ".",
     clearScreen: false,
     assetsInclude: ['**/*.pdf'],
-    publicDir: resolve(__dirname, "./src/Client/public"),
+    publicDir: resolve(__dirname, "./Client/public"),
     build: {
         outDir: resolve(__dirname, "./dist/public"),
         emptyOutDir: true,

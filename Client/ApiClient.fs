@@ -1,13 +1,13 @@
-module Api
+module ApiClient
 
 open Fable.Remoting.Client
 
-let Account: Shared.Api.Account.IAccountApi =
-  Remoting.createApi ()
-  |> Remoting.withBaseUrl "/api"
-  |> Remoting.buildProxy<Shared.Api.Account.IAccountApi>
-
-let VesselApi: Shared.Api.Vessel.IVesselApi =
+let Vessel: Shared.Api.Vessel.IVesselApi =
   Remoting.createApi ()
   |> Remoting.withBaseUrl "/api"
   |> Remoting.buildProxy<Shared.Api.Vessel.IVesselApi>
+
+let Port: Shared.Api.Port.IPortApi =
+  Remoting.createApi ()
+  |> Remoting.withBaseUrl "/api"
+  |> Remoting.buildProxy<Shared.Api.Port.IPortApi>
