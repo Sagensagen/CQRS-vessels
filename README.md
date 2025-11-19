@@ -1,1 +1,1 @@
-# CQRS-banking
+# CQRS-vessels
