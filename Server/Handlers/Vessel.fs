@@ -89,6 +89,21 @@ let private vesselApi (ctx: HttpContext) : Shared.Api.Vessel.IVesselApi =
                 let! res = Command.VesselHandler.decide newCommand session
                 return res
             }
+      UpdatePosition =
+        fun id position ->
+            asyncResult {
+                let session = ctx.GetService<IDocumentSession>()
+
+                let newCommand =
+                    Command.VesselHandler.UpdateVesselPosition
+                        { VesselId = id
+                          Position = position
+                          Inserted = position.Timestamp }
+
+                let! res = Command.VesselHandler.decide newCommand session
+                return res
+
+            }
       GetEvents =
         fun id ->
             asyncResult {

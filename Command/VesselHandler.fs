@@ -60,7 +60,7 @@ type CompleteUnloading = {
 
 type UpdateVesselPosition = {
     VesselId: Guid
-    Position: string
+    Position: VesselPosition
     Inserted: DateTimeOffset
 }
 
@@ -196,7 +196,7 @@ let private completeUnloading (command: CompleteUnloading) (session: IDocumentSe
 
 let private updateVesselPosition (command: UpdateVesselPosition) (session: IDocumentSession) =
     asyncResult {
-        let event = { Position = command.Position }
+        let event: Event.VesselPositionUpdated = command.Position
         let stream = session.Events.Append(command.VesselId, event)
         do! session.SaveChangesAsync() |> Async.AwaitTask
         return stream.Id

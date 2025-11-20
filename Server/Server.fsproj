@@ -33,5 +33,9 @@
 <!--    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="8.1.4" />-->
 <!--    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="9.0.6" />-->
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
     
 </Project>

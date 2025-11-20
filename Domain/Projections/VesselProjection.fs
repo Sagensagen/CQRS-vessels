@@ -61,7 +61,7 @@ type VesselViewProjection() =
             Position = event
     }
 
-    member this.Apply (event: Event.VesselDecommissioned, current: VesselView) : VesselView = {
+    member this.Apply (_event: Event.VesselDecommissioned, current: VesselView) : VesselView = {
         current with
             State = Decommissioned
     }

@@ -83,7 +83,6 @@ type VesselDTO = {
 type DepartVesselRequest = { FromPort: string }
 type ArriveVesselRequest = { AtPort: string }
 type StartLoadingRequest = { CargoId: Guid }
-type UpdateVesselPositionRequest = { Position: string }
 
 type VesselEventType =
     | Success
@@ -116,5 +115,6 @@ type IVesselApi = {
     GetAllVessels: unit -> Async<Result<VesselDTO array, VesselQueryErrors>>
     // UpdateActivity: VesselActivity -> Async<Result<unit, VesselCommandErrors>>
     UpdateOperationalStatus: Guid -> OperationalStatus -> Async<Result<Guid, VesselCommandErrors>>
+    UpdatePosition: Guid -> VesselPosition -> Async<Result<Guid, VesselCommandErrors>>
     GetEvents: Guid -> Async<Result<VesselEvent array, VesselQueryErrors>>
 }

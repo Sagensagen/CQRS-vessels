@@ -2,20 +2,11 @@ module Client.VesselStatus
 
 open System
 open Browser.Types
-open Fable.Core.DynamicExtensions
+open Feliz.PigeonMaps
 open Feliz
 open FS.FluentUI
 open Shared.Api.Vessel
 open Fable.Core
-
-// let private updateActivity (activity: VesselActivity) callback setCtx =
-//   ApiClient.Vessel.UpdateActivity activity
-//   |> Async.StartAsPromise
-//   |> Promise.tap (fun res ->
-//     match res with
-//     | Ok _ ->  ()
-//     | Error e -> Toasts.errorToast setCtx "updateVesselActivityError" "Could not update" "" None
-//   )
 
 let private updateOperationalStatus (vesselId: Guid) (status: OperationalStatus) callback setCtx =
   ApiClient.Vessel.UpdateOperationalStatus vesselId status
@@ -27,8 +18,146 @@ let private updateOperationalStatus (vesselId: Guid) (status: OperationalStatus)
   )
   |> Promise.catchEnd (fun e -> Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None)
 
+let private updatePosition (vesselId: Guid) (position: VesselPosition) callback setCtx =
+  ApiClient.Vessel.UpdatePosition vesselId position
+  |> Async.StartAsPromise
+  |> Promise.tap (fun res ->
+    match res with
+    | Ok _ ->
+      Toasts.successToast setCtx $"updatePositionsuccess{vesselId}" "Position updated" ""
+      callback ()
+    | Error e -> Toasts.errorToast setCtx "updateVesselPositionError" "Could not update position" $"{e}" None
+  )
+  |> Promise.catchEnd (fun e ->
+    Toasts.errorToast setCtx "updateVesselPositionError" "Could not update position" $"{e}" None
+  )
+
 [<ReactComponent>]
-let private VesselActionDialog (vessel: VesselDTO) =
+let private VesselPositionDialog (vessel: VesselDTO) =
+  let position, setPosition =
+    React.useState<VesselPosition option> (Some vessel.Position)
+  let _ctx, setCtx = Context.useCtx ()
+  let isOpen, setIsOpen = React.useState false
+  let isSending, setIsSending = React.useState false
+  Fui.dialog [
+    dialog.open' isOpen
+    dialog.onOpenChange (fun (d: DialogOpenChangeData<MouseEvent>) -> setIsOpen d.``open``)
+    dialog.children [
+      Fui.dialogTrigger [
+        dialogTrigger.disableButtonEnhancement true
+        dialogTrigger.children (
+          Html.div [
+            Fui.button [
+              button.icon (Fui.icon.locationRippleRegular [])
+              button.text "Update position"
+              button.appearance.primary
+              button.iconPosition.after
+            ]
+          ]
+        )
+      ]
+      Fui.dialogSurface [
+        dialogSurface.style [
+          style.height (length.vh 95)
+          style.minWidth (length.vw 95)
+        ]
+        dialogSurface.children [
+          Fui.dialogBody [
+            dialogBody.style [
+              style.height (length.perc 100)
+              style.width (length.perc 100)
+            ]
+            dialogBody.children [
+              Fui.dialogTitle [
+                dialogTitle.as'.h1
+                dialogTitle.text "Vessel position"
+                dialogTitle.action (
+                  Fui.button [
+                    button.appearance.transparent
+                    button.icon (Fui.icon.dismissRegular [])
+                    button.onClick (fun _ -> setIsOpen false)
+                  ]
+                )
+              ]
+              Fui.dialogContent [
+                dialogContent.style [
+                  style.display.flex
+                  style.flexDirection.column
+                  style.height (length.perc 100)
+                  style.padding 0
+                  style.gap (length.rem 1)
+                ]
+                dialogContent.children [
+                  PigeonMaps.map [
+                    match position with
+                    | None -> ()
+                    | Some pos -> map.center (pos.Latitude, pos.Longitude)
+                    map.onClick (fun pos ->
+                      {Latitude = fst pos.latLng; Longitude = snd pos.latLng; Timestamp = DateTimeOffset.UtcNow}
+                      |> Some
+                      |> setPosition
+                    )
+                    map.zoom 5
+                    map.markers [
+                      match position with
+                      | None -> ()
+                      | Some latLong ->
+                        PigeonMaps.marker [
+                          marker.anchor (latLong.Latitude, latLong.Longitude)
+                          marker.render (fun marker ->
+                            Fui.icon.vehicleShipFilled [
+                              icon.size.``28``
+                              icon.primaryFill Theme.tokens.colorBrandBackground
+                            ]
+                          )
+                        ]
+                    ]
+                  ]
+                  Html.div [
+                    prop.style [
+                      style.position.absolute
+                      style.bottom (length.rem 4)
+                      style.right (length.rem 4)
+                      style.zIndex 1000
+                    ]
+                    prop.children [
+                      match position with
+                      | None -> Html.none
+                      | Some pos ->
+                        Fui.button [
+                          button.children [
+                            if isSending then
+                              Fui.spinner [spinner.size.extraSmall]
+                            else
+                              Fui.text "Send"
+                          ]
+                          button.icon (Fui.icon.sendRegular [])
+                          button.appearance.primary
+                          button.onClick (fun _ ->
+                            setIsSending true
+                            updatePosition
+                              vessel.Id
+                              pos
+                              (fun id ->
+                                setIsSending false
+                                setIsOpen false
+                              )
+                              setCtx
+                          )
+                        ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+
+[<ReactComponent>]
+let private VesselStatusDialog (vessel: VesselDTO) =
   let _ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
@@ -325,7 +454,16 @@ let VesselStatus () =
         ]
       | Some vessel ->
         Fui.text.body1Strong vessel.Name
-        VesselActionDialog vessel
+        Html.div [
+          prop.style [
+            style.display.flex
+            style.gap (length.rem 1)
+          ]
+          prop.children [
+            VesselStatusDialog vessel
+            VesselPositionDialog vessel
+          ]
+        ]
         Html.div [
           prop.style [
             style.display.flex
