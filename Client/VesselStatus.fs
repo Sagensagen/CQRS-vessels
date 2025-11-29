@@ -2,21 +2,37 @@ module Client.VesselStatus
 
 open System
 open Browser.Types
+open Fable.Parsimmon.Parsimmon
 open Feliz.PigeonMaps
 open Feliz
 open FS.FluentUI
 open Shared.Api.Vessel
 open Fable.Core
 
-let private updateOperationalStatus (vesselId: Guid) (status: OperationalStatus) callback setCtx =
+let private updateOperationalStatus
+  (vesselId: Guid)
+  (status: VesselStatusCommand)
+  callback
+  (setIsFetching: bool -> unit)
+  setCtx
+  =
   ApiClient.Vessel.UpdateOperationalStatus vesselId status
   |> Async.StartAsPromise
   |> Promise.tap (fun res ->
-    match res with
-    | Ok _ -> callback ()
-    | Error e -> Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None
+    try
+      match res with
+      | Ok _ ->
+        Toasts.successToast setCtx "updateVesselStatusSuccess" "Vessel updated" $"Vessel updated successfully"
+        callback ()
+      | Error e -> Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None
+    finally
+      printfn "sdsd"
+      setIsFetching false
   )
-  |> Promise.catchEnd (fun e -> Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None)
+  |> Promise.catchEnd (fun e ->
+    setIsFetching false
+    Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None
+  )
 
 let private updatePosition (vesselId: Guid) (position: VesselPosition) callback setCtx =
   ApiClient.Vessel.UpdatePosition vesselId position
@@ -36,7 +52,7 @@ let private updatePosition (vesselId: Guid) (position: VesselPosition) callback 
 let private VesselPositionDialog (vessel: VesselDTO) =
   let position, setPosition =
     React.useState<VesselPosition option> (Some vessel.Position)
-  let _ctx, setCtx = Context.useCtx ()
+  let ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
   Fui.dialog [
@@ -161,7 +177,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
   let _ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
-  let status, setStatus = React.useState<OperationalStatus option> None
+  let status, setStatus = React.useState<VesselStatusCommand option> None
   Fui.dialog [
     dialog.open' isOpen
     dialog.onOpenChange (fun (d: DialogOpenChangeData<MouseEvent>) -> setIsOpen d.``open``)
@@ -234,7 +250,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                     Fui.card [
                       let isSelected =
                         (match status with
-                         | (Some OperationalStatus.AtSea) -> true
+                         | (Some (Depart _)) -> true
                          | _ -> false)
                       card.orientation.horizontal
                       card.style [
@@ -254,12 +270,16 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         Fui.text "Depart from port"
                         Fui.icon.sendRegular [icon.size.``24``]
                       ]
-                      card.onClick (fun _ -> setStatus (Some AtSea))
+                      card.onClick (fun _ ->
+                        match vessel.State with
+                        | Docked port -> setStatus (Some (Depart port))
+                        | _ -> ()
+                      )
                     ]
                     Fui.card [
                       let isSelected =
                         (match status with
-                         | Some (OperationalStatus.Docked _) -> true
+                         | Some (Arrive _) -> true
                          | _ -> false)
                       card.orientation.horizontal
                       card.disabled (
@@ -279,12 +299,12 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         Fui.text "Arrive at port"
                         Fui.icon.locationArrowLeftRegular [icon.size.``24``]
                       ]
-                      card.onClick (fun _ -> setStatus (Some (Docked "")))
+                      card.onClick (fun _ -> setStatus (Some (Arrive (Guid.Empty))))
                     ]
                     Fui.card [
                       let isSelected =
                         (match status with
-                         | Some (OperationalStatus.Anchored _) -> true
+                         | Some (Anchor _) -> true
                          | _ -> false)
                       card.orientation.horizontal
                       card.disabled (
@@ -306,12 +326,12 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         Fui.icon.waterRegular [icon.size.``24``]
                       ]
 
-                      card.onClick (fun _ -> setStatus (Some (Anchored "")))
+                      card.onClick (fun _ -> setStatus (Some (Anchor "Somewhere")))
                     ]
                     Fui.card [
                       let isSelected =
                         (match status with
-                         | Some OperationalStatus.UnderMaintenance -> true
+                         | Some StartMaintenance -> true
                          | _ -> false)
                       card.orientation.horizontal
                       card.disabled (
@@ -333,7 +353,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         Fui.text "Under maintenance"
                         Fui.icon.wrenchSettingsRegular [icon.size.``24``]
                       ]
-                      card.onClick (fun _ -> setStatus (Some UnderMaintenance))
+                      card.onClick (fun _ -> setStatus (Some StartMaintenance))
                     ]
                   // Fui.card [
                   //   card.orientation.horizontal
@@ -356,24 +376,44 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                   ]
                 ]
                 match status with
-                | Some (Docked port) ->
+                | Some (Arrive port) ->
                   Fui.field [
                     field.label "Port"
                     field.children [
+                      Fui.dropdown [
+                        dropdown.onOptionSelect (fun vv ->
+                          vv.optionValue
+                          |> Option.iter (fun v ->
+                            let parsed = Guid.Parse v
+                            setStatus (Some (Arrive parsed))
+                          )
+                        )
+                        dropdown.children [
+                          yield!
+                            _ctx.AllPorts
+                            |> Array.map (fun port ->
+                              Fui.option [
+                                option.text port.Name
+                                option.value (port.Id.ToString ())
+                                option.children [Fui.text port.Name]
+                              ]
+                            )
+                        ]
+                      ]
                       Fui.input [
                         input.value port
                         input.placeholder "What port are you docking at?"
-                        input.onChange (fun (v: string) -> setStatus (Some (Docked v)))
+                        input.onChange (fun (v: string) -> setStatus (Some (Arrive (Guid.NewGuid ()))))
                       ]
                     ]
                   ]
-                | Some (Anchored _) ->
+                | Some (Anchor _) ->
                   Fui.field [
                     field.label "Position"
                     field.children [
                       Fui.input [
                         input.placeholder "Where anchored?"
-                        input.onChange (fun (v: string) -> setStatus (Some (Anchored v)))
+                        input.onChange (fun (v: string) -> setStatus (Some (Anchor v)))
                       ]
                     ]
                   ]
@@ -399,8 +439,8 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                     isSending
                     || match status with
                        | None -> true
-                       | Some (Docked "") -> true
-                       | Some (Anchored "") -> true
+                       | Some (Anchor "") -> true
+                       | Some (Arrive s) when s = Guid.Empty -> true
                        | _ -> false
 
                   )
@@ -420,8 +460,8 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         (fun s ->
                           setIsSending false
                           setIsOpen false
-
                         )
+                        setIsSending
                         setCtx
                     | None -> ()
                   )
@@ -442,6 +482,9 @@ let VesselStatus () =
       style.display.flex
       style.flexDirection.column
       style.gap (length.rem 1)
+      style.padding (length.rem 1)
+      style.height (length.vh 100)
+      style.overflowY.scroll
     ]
     prop.children [
       Fui.text.title2 "Vessel status"
@@ -612,6 +655,7 @@ let VesselStatus () =
         Fui.card [
           card.style [
             style.height 300
+            style.minHeight 300
             style.width (length.perc 100)
           ]
           card.children [

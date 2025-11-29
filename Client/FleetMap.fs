@@ -47,7 +47,6 @@ let FleetMap () =
                 ])
               ]
             )
-
           yield!
             ctx.AllPorts
             |> Array.map (fun port ->
@@ -57,7 +56,18 @@ let FleetMap () =
                 marker.offsetTop 30
                 marker.render (fun marker -> [
                   Fui.tooltip [
-                    tooltip.content port.Name
+                    tooltip.content (
+                      Html.div [
+                        prop.style [
+                          style.display.flex
+                          style.flexDirection.column
+                        ]
+                        prop.children [
+                          Fui.text port.Name
+                          Fui.text.caption1 $"{port.CurrentDocked}/{port.MaxDocks}"
+                        ]
+                      ]
+                    )
                     tooltip.children [
                       Fui.button [
                         button.size.large
@@ -65,7 +75,10 @@ let FleetMap () =
                         button.children [
                           Fui.icon.locationFilled [
                             icon.style [style.fontSize 34]
-                            icon.primaryFill Theme.tokens.colorBrandBackground
+                            if port.CurrentDocked >= port.MaxDocks then
+                              icon.primaryFill Theme.tokens.colorStatusWarningBackground3
+                            else
+                              icon.primaryFill Theme.tokens.colorBrandBackground
                           ]
                         ]
                       ]

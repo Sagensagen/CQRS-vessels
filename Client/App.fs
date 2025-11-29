@@ -56,7 +56,8 @@ let private Application () =
           Html.main [
             prop.style [
               style.flexGrow 1
-              style.padding (length.rem 1)
+              style.maxHeight (length.vh 100)
+
               style.backgroundColor Theme.tokens.colorNeutralBackground2
             ]
             prop.children [

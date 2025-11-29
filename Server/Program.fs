@@ -2,70 +2,50 @@ module Server
 
 #nowarn "20"
 
-open System.Text.Json.Serialization
 open Giraffe
-open JasperFx.Events.Projections
-open Marten
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.DependencyInjection
 open Serilog
-open Serilog.Events
-
 
 module Program =
     let exitCode = 0
 
-    let webApp = choose [ Handlers.Vessel.vesselHandler; Handlers.Port.vesselHandler ]
+    let webApp =
+        choose [ Api.Vessel.vesselHandler; Api.Port.portHandler; Simulation.simuationHandler ]
 
     [<EntryPoint>]
     let main args =
-        Log.Logger <-
-            LoggerConfiguration()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-                .MinimumLevel.Override("Marten", LogEventLevel.Warning)
-                .MinimumLevel.Override("Npgsql", LogEventLevel.Warning)
-                .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .CreateLogger()
+        try
+            Log.Logger <- Infrastructure.Logger.configureLogging().CreateLogger()
 
-        let builder = WebApplication.CreateBuilder(args)
-        builder.WebHost.UseUrls("http://localhost:5000") |> ignore
+            Log.Information("Starting CQRS Vessel Management System")
 
-        builder.Services
-            .AddSerilog()
-            .AddMarten(fun (options: StoreOptions) ->
-                options.Connection("Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres")
+            let builder = WebApplication.CreateBuilder(args)
+            builder.WebHost.UseUrls("http://localhost:5000") |> ignore
 
-                options.AutoCreateSchemaObjects <- JasperFx.AutoCreate.All
-                // options.Events.DatabaseSchemaName <- "events"
+            builder.Services.AddSerilog()
+            |> Infrastructure.AkkaConfig.addAkkaServices
+            |> Infrastructure.MartenConfig.configureMarten
 
-                options.Projections.Add(
-                    Domain.Projections.VesselProjection.VesselViewProjection(),
-                    ProjectionLifecycle.Inline
-                )
+            builder.Services.AddSingleton<CommandGateway.CommandGateway>(fun sp ->
+                let actorSystem = sp.GetRequiredService<Akka.Actor.ActorSystem>()
+                let documentStore = sp.GetRequiredService<Marten.IDocumentStore>()
+                CommandGateway.CommandGateway(actorSystem, documentStore))
 
-                options.Projections.Add(
-                    Domain.Projections.PortProjection.PortViewProjection(),
-                    ProjectionLifecycle.Inline
-                )
+            let app = builder.Build()
 
-                let serializer = Marten.Services.SystemTextJsonSerializer()
-                serializer.Configure(_.Converters.Add(JsonFSharpConverter()))
+            app.UseSerilogRequestLogging().UseGiraffe(webApp)
 
-                options.Serializer serializer
-                options.UseNewtonsoftForSerialization())
-            .UseLightweightSessions()
-        |> ignore
+            Log.Information("CQRS Vessel Management System started successfully on http://localhost:5000")
+            Log.Information("Event Store: PostgreSQL via Marten")
+            Log.Information("Actor System: Akka.NET with manual Marten persistence")
 
-        let app = builder.Build()
+            app.Run()
 
-        app
-            .UseSerilogRequestLogging(fun options ->
-                options.MessageTemplate <- "{RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0} ms")
+            exitCode
 
-            .UseGiraffe(webApp)
-
-        app.Run()
-
-        exitCode
+        with ex ->
+            Log.Fatal(ex, "Application terminated unexpectedly")
+            1

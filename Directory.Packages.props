@@ -1,0 +1,56 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    </PropertyGroup>
+
+    <ItemGroup>
+
+        <PackageVersion Include="FSharp.Core" Version="10.0.100" />
+        <PackageVersion Include="FSharp.SystemTextJson" Version="1.4.36" />
+
+        <PackageVersion Include="Akka" Version="1.5.56" />
+        <PackageVersion Include="Akka.DependencyInjection" Version="1.5.55" />
+        <PackageVersion Include="Akka.FSharp" Version="1.5.56" />
+        <PackageVersion Include="Akka.Hosting" Version="1.5.55.1" />
+        <PackageVersion Include="Akka.Persistence" Version="1.5.55" />
+        <PackageVersion Include="Akka.Persistence.Query" Version="1.5.55" />
+        <PackageVersion Include="Akka.Streams" Version="1.5.55" />
+
+        <PackageVersion Include="Marten" Version="8.14.0" />
+        <PackageVersion Include="Marten.AspNetCore" Version="8.14.0" />
+        <PackageVersion Include="Weasel.Postgresql" Version="8.2.0" />
+
+        <PackageVersion Include="Npgsql" Version="9.0.2" />
+        <PackageVersion Include="Npgsql.Json.NET" Version="9.0.2" />
+
+        <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.11" />
+
+        <PackageVersion Include="Fable.Core" Version="4.5.0" />
+        <PackageVersion Include="Fable.DateFunctions" Version="3.9.0" />
+        <PackageVersion Include="Fable.Promise" Version="3.2.0" />
+        <PackageVersion Include="Fable.React" Version="9.4.0" />
+        <PackageVersion Include="Fable.Remoting.Client" Version="7.35.0" />
+        <PackageVersion Include="Fable.Remoting.Giraffe" Version="5.21.0" />
+        <PackageVersion Include="Fable.Remoting.Server" Version="5.39.0" />
+
+        <PackageVersion Include="Feliz" Version="2.9.0" />
+        <PackageVersion Include="Feliz.PigeonMaps" Version="3.0.0" />
+        <PackageVersion Include="Feliz.Router" Version="4.0.0" />
+        <PackageVersion Include="Feliz.UseMediaQuery" Version="1.5.0" />
+        <PackageVersion Include="FS.FluentUI" Version="2.5.1" />
+        <PackageVersion Include="FS.FluentUI.V8toV9" Version="1.0.2" />
+
+        <PackageVersion Include="Giraffe" Version="7.0.2" />
+
+        <PackageVersion Include="Serilog" Version="4.3.0" />
+        <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+
+        <PackageVersion Include="FsToolkit.ErrorHandling" Version="5.1.0" />
+
+        <PackageVersion Include="xunit" Version="2.9.2" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+
+    </ItemGroup>
+</Project>

@@ -7,6 +7,7 @@ open FS.FluentUI.V8toV9
 open Feliz
 open FS.FluentUI
 open Shared.Api.Port
+open Shared.Api.Simulation
 open Shared.Api.Vessel
 open Fable.Core
 
@@ -405,104 +406,143 @@ let SideBar () =
     fluentProvider.children [
       Html.div [
         prop.style [
-          style.width 280
-          style.height (length.perc 100)
           style.backgroundColor Theme.tokens.colorBrandStroke2Pressed
-          style.display.flex
-          style.flexDirection.column
-          style.gap 5
-          style.padding (length.rem 1)
+          style.height (length.vh 100)
         ]
         prop.children [
-          Fui.stack [
-            stack.horizontal true
-            stack.verticalAlign.center
-            stack.children [
-              Fui.stackItem [
-                Fui.icon.layerRegular [icon.size.``48``]
-              ]
-              Fui.stackItem [Fui.text.title3 "Fleet manager"]
+          Html.div [
+            prop.style [
+              style.width 280
+              style.display.flex
+              style.flexDirection.column
+              style.gap 5
+              style.padding (length.rem 1)
             ]
-          ]
-          VesselDropdown (UpdateSelectedVessel >> setCtx)
-          Html.div [prop.style []; prop.children []]
-          Fui.card [
-            card.appearance.subtle
-            card.selected (SelectedView.FleetMap = ctx.SelectedView)
-            card.onClick (fun _ -> (UpdateSelectedView SelectedView.FleetMap) |> setCtx)
-            card.children [
-              Html.div [
-                prop.style [
-                  style.display.flex
-                  style.alignItems.center
-                  style.gap 10
-                ]
-                prop.children [
-                  Fui.icon.mapRegular [icon.size.``24``]
-                  Fui.text.body1Strong "Fleet map"
+            prop.children [
+              Fui.stack [
+                stack.horizontal true
+                stack.verticalAlign.center
+                stack.children [
+                  Fui.stackItem [
+                    Fui.icon.layerRegular [icon.size.``48``]
+                  ]
+                  Fui.stackItem [Fui.text.title3 "Fleet manager"]
                 ]
               ]
-            ]
-          ]
-          Fui.card [
-            card.appearance.subtle
-            card.selected (SelectedView.VesselStatus = ctx.SelectedView)
-            card.onClick (fun _ -> (UpdateSelectedView SelectedView.VesselStatus) |> setCtx)
-            card.children [
-              Html.div [
-                prop.style [
-                  style.display.flex
-                  style.alignItems.center
-                  style.gap 10
-                ]
-                prop.children [
-                  Fui.icon.vehicleShipRegular [icon.size.``24``]
-                  Fui.text.body1Strong "Vessel status"
-                ]
-              ]
-            ]
-          ]
-          Fui.card [
-            card.appearance.subtle
-            card.selected (SelectedView.VesselEventHistory = ctx.SelectedView)
-            card.onClick (fun _ ->
-              (UpdateSelectedView SelectedView.VesselEventHistory)
-              |> setCtx
-            )
-            card.children [
-              Html.div [
-                prop.style [
-                  style.display.flex
-                  style.alignItems.center
-                  style.gap 10
-                ]
-                prop.children [
-                  Fui.icon.timerRegular [icon.size.``24``]
-                  Fui.text.body1Strong "Event history"
+              VesselDropdown (UpdateSelectedVessel >> setCtx)
+              Html.div [prop.style []; prop.children []]
+              Fui.card [
+                card.appearance.subtle
+                card.selected (SelectedView.FleetMap = ctx.SelectedView)
+                card.onClick (fun _ -> (UpdateSelectedView SelectedView.FleetMap) |> setCtx)
+                card.children [
+                  Html.div [
+                    prop.style [
+                      style.display.flex
+                      style.alignItems.center
+                      style.gap 10
+                    ]
+                    prop.children [
+                      Fui.icon.mapRegular [icon.size.``24``]
+                      Fui.text.body1Strong "Fleet map"
+                    ]
+                  ]
                 ]
               ]
-            ]
-          ]
-          Fui.card [
-            card.selected (SelectedView.VesselPlans = ctx.SelectedView)
-            card.onClick (fun _ -> (UpdateSelectedView SelectedView.VesselPlans) |> setCtx)
-            card.appearance.subtle
-            card.children [
-              Html.div [
-                prop.style [
-                  style.display.flex
-                  style.alignItems.center
-                  style.gap 10
-                ]
-                prop.children [
-                  Fui.icon.calendarRegular [icon.size.``24``]
-                  Fui.text.body1Strong "Plans"
+              Fui.card [
+                card.appearance.subtle
+                card.selected (SelectedView.VesselStatus = ctx.SelectedView)
+                card.onClick (fun _ -> (UpdateSelectedView SelectedView.VesselStatus) |> setCtx)
+                card.children [
+                  Html.div [
+                    prop.style [
+                      style.display.flex
+                      style.alignItems.center
+                      style.gap 10
+                    ]
+                    prop.children [
+                      Fui.icon.vehicleShipRegular [icon.size.``24``]
+                      Fui.text.body1Strong "Vessel status"
+                    ]
+                  ]
                 ]
               ]
+              Fui.card [
+                card.appearance.subtle
+                card.selected (SelectedView.VesselEventHistory = ctx.SelectedView)
+                card.onClick (fun _ ->
+                  (UpdateSelectedView SelectedView.VesselEventHistory)
+                  |> setCtx
+                )
+                card.children [
+                  Html.div [
+                    prop.style [
+                      style.display.flex
+                      style.alignItems.center
+                      style.gap 10
+                    ]
+                    prop.children [
+                      Fui.icon.timerRegular [icon.size.``24``]
+                      Fui.text.body1Strong "Event history"
+                    ]
+                  ]
+                ]
+              ]
+              Fui.card [
+                card.selected (SelectedView.VesselPlans = ctx.SelectedView)
+                card.onClick (fun _ -> (UpdateSelectedView SelectedView.VesselPlans) |> setCtx)
+                card.appearance.subtle
+                card.children [
+                  Html.div [
+                    prop.style [
+                      style.display.flex
+                      style.alignItems.center
+                      style.gap 10
+                    ]
+                    prop.children [
+                      Fui.icon.calendarRegular [icon.size.``24``]
+                      Fui.text.body1Strong "Plans"
+                    ]
+                  ]
+                ]
+              ]
+              Fui.card [
+                card.onClick (fun _ ->
+                  let simConfig: SimulationConfig = {
+                    VesselCount = 10
+                    PortCount = 3
+                    OperationDelayMs = 2000
+                    DockDurationMs = 5000
+                  }
+                  ApiClient.Simulation.ExecuteSimulation simConfig
+                  |> Async.StartAsPromise
+                  |> Promise.tap (fun res ->
+                    match res with
+                    | Ok () -> ()
+                    | Error e -> ()
+                  )
+                  |> Promise.catchEnd (fun _ -> ())
+                )
+                card.appearance.subtle
+                card.children [
+                  Html.div [
+                    prop.style [
+                      style.display.flex
+                      style.alignItems.center
+                      style.gap 10
+                    ]
+                    prop.children [
+                      Fui.icon.connectedRegular [icon.size.``24``]
+                      Fui.text.body1Strong "Simulate"
+                    ]
+                  ]
+                ]
+              ]
+              AddVesselDialog ()
+              AddPortDialog ()
             ]
           ]
-          AddVesselDialog ()
-          AddPortDialog ()
+
         ]
       ]
     ]

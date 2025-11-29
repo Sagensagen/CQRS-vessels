@@ -2,12 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="VesselHandler.fs" />
-    <Compile Include="PortHandler.fs" />
+    <Compile Include="VesselActor.fs" />
+    <Compile Include="PortActor.fs" />
+    <Compile Include="DockingSaga.fs" />
+    <Compile Include="SagaCoordinator.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,9 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.1.0" />
-    <PackageReference Include="Marten" Version="8.14.0" />
-    <PackageReference Update="FSharp.Core" Version="9.0.100" />
+    <PackageReference Include="Akka.Hosting" />
+    <PackageReference Include="Akka.FSharp" />
+    <PackageReference Include="Marten"  />
+    <PackageReference Update="FSharp.Core"  />
+    <PackageReference Include="Serilog"  />
   </ItemGroup>
 
 </Project>
