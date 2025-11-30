@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,18 +19,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fable.Core" Version="4.5.0" />
-    <PackageReference Include="Fable.DateFunctions" Version="3.9.0" />
-    <PackageReference Include="Fable.Promise" Version="3.2.0" />
-    <PackageReference Include="Fable.React" Version="9.4.0" />
-    <PackageReference Include="Fable.Remoting.Client" Version="7.35.0" />
-    <PackageReference Include="Feliz" Version="2.9.0" />
-    <PackageReference Include="Feliz.PigeonMaps" Version="3.0.0" />
-    <PackageReference Include="Feliz.Router" Version="4.0.0" />
-    <PackageReference Include="Feliz.UseMediaQuery" Version="1.5.0" />
-    <PackageReference Include="FS.FluentUI" Version="2.5.1" />
-    <PackageReference Include="FS.FluentUI.V8toV9" Version="1.0.2" />
-    <PackageReference Update="FSharp.Core" Version="9.0.100" />
+    <PackageReference Include="Fable.Core" />
+    <PackageReference Include="Fable.DateFunctions" />
+    <PackageReference Include="Fable.Promise" />
+    <PackageReference Include="Fable.React" />
+    <PackageReference Include="Fable.Remoting.Client" />
+    <PackageReference Include="Feliz" />
+    <PackageReference Include="Feliz.PigeonMaps" />
+    <PackageReference Include="Feliz.Router" />
+    <PackageReference Include="Feliz.UseMediaQuery" />
+    <PackageReference Include="FS.FluentUI" />
+    <PackageReference Include="FS.FluentUI.V8toV9" />
+    <PackageReference Update="FSharp.Core" />
   </ItemGroup>
 
   <ItemGroup>

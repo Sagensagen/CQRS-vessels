@@ -40,8 +40,24 @@ type PortDTO = {
     Inserted: DateTimeOffset
 }
 
+// Error types for command operations
+type PortCommandErrors =
+    | PortNotFound
+    | PortAlreadyRegistered
+    | PortAlreadyOpen
+    | PortAlreadyClosed
+    | NoDockingSpaceAvailable
+    | VesselNotDockedAtPort
+    | ReservationNotFound
+    | InvalidPortState of expected: string * actual: string
+    | CommandFailed of message: string
+
+// Error types for query operations
+type PortQueryErrors =
+    | PortNotFound
+    | QueryFailed of message: string
+
 type IPortApi = {
-    CreatePort: RegisterPortRequest -> Async<Result<Guid, string>>
-    // GetPort: Guid -> Async<Result<PortDTO, string>>
-    GetAllPorts: unit -> Async<Result<PortDTO array, string>>
+    CreatePort: RegisterPortRequest -> Async<Result<Guid, PortCommandErrors>>
+    GetAllPorts: unit -> Async<Result<PortDTO array, PortQueryErrors>>
 }

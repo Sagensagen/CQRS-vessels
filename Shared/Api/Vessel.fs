@@ -27,7 +27,7 @@ and CargoOperation =
 
 and OperationalStatus =
     | AtSea
-    | Docked of port: string
+    | Docked of port: Guid
     | Anchored of location: string
     | UnderMaintenance
     | Decommissioned
@@ -80,21 +80,12 @@ type VesselDTO = {
     Inserted: DateTimeOffset
 }
 
-type DepartVesselRequest = { FromPort: string }
-type ArriveVesselRequest = { AtPort: string }
-type StartLoadingRequest = { CargoId: Guid }
-
-type VesselEventType =
-    | Success
-    | Fail
-    | Info
-
-type VesselEvent = {
-    Title: string
-    Description: string
-    EventType: VesselEventType
-    Inserted: DateTimeOffset
-}
+type VesselStatusCommand =
+    | Arrive of portId: Guid
+    | Depart of portId: Guid
+    | Anchor of location: string
+    | StartMaintenance
+    | Decommission
 
 type VesselCommandErrors =
     | VesselIdAlreadyExists
@@ -102,6 +93,7 @@ type VesselCommandErrors =
     | VesselAlreadyDecommissioned
     | VesselAlreadyDeparted
     | VesselIsAlreadyArrived
+    | NoDockingAvailableAtPort
     | InvalidVesselState of expected: string * actual: string
     | CargoNotFound
     | PortNotFound
@@ -113,8 +105,7 @@ type IVesselApi = {
     CreateVessel: RegisterVesselRequest -> Async<Result<Guid, VesselCommandErrors>>
     GetVessel: Guid -> Async<Result<VesselDTO, VesselQueryErrors>>
     GetAllVessels: unit -> Async<Result<VesselDTO array, VesselQueryErrors>>
-    // UpdateActivity: VesselActivity -> Async<Result<unit, VesselCommandErrors>>
-    UpdateOperationalStatus: Guid -> OperationalStatus -> Async<Result<Guid, VesselCommandErrors>>
+    UpdateOperationalStatus: Guid -> VesselStatusCommand -> Async<Result<Guid, VesselCommandErrors>>
     UpdatePosition: Guid -> VesselPosition -> Async<Result<Guid, VesselCommandErrors>>
-    GetEvents: Guid -> Async<Result<VesselEvent array, VesselQueryErrors>>
+    GetEvents: Guid -> Async<Result<Shared.EventWrapper array, VesselQueryErrors>>
 }

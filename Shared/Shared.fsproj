@@ -2,19 +2,18 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Api\Shared.fs" />
     <Compile Include="Api\Vessel.fs" />
+    <Compile Include="Api\Simulation.fs" />
     <Compile Include="Api\Port.fs" />
   </ItemGroup>
 
   <ItemGroup>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="9.0.100" />
+    <PackageReference Update="FSharp.Core" />
   </ItemGroup>
 
 </Project>

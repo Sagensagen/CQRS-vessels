@@ -7,7 +7,7 @@ open FS.FluentUI
 open Shared.Api.Vessel
 open Fable.Core
 
-let getVesselEvents (vesselId: Guid) (callback: VesselEvent array -> unit) setCtx =
+let getVesselEvents (vesselId: Guid) (callback: Shared.Api.Shared.EventWrapper array -> unit) setCtx =
   ApiClient.Vessel.GetEvents vesselId
   |> Async.StartAsPromise
   |> Promise.tap (fun res ->
@@ -17,7 +17,7 @@ let getVesselEvents (vesselId: Guid) (callback: VesselEvent array -> unit) setCt
   )
   |> Promise.catchEnd (fun e -> Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None)
 
-let private eventLayout (event: VesselEvent) =
+let private eventLayout (event: Shared.Api.Shared.EventWrapper) =
   Html.div [
     prop.style [
       style.display.flex
@@ -41,10 +41,10 @@ let private eventLayout (event: VesselEvent) =
             prop.children [
               Fui.badge [
                 badge.style [style.width 40; style.height 40]
-                if event.EventType = Success then
+                if event.EventType = Shared.Api.Shared.Success then
                   badge.color.success
                   badge.icon (Fui.icon.checkmarkCircleRegular [icon.size.``24``])
-                elif event.EventType = Info then
+                elif event.EventType = Shared.Api.Shared.Info then
                   badge.color.brand
                   badge.icon (Fui.icon.infoRegular [icon.size.``24``])
                 else
@@ -88,7 +88,7 @@ let private eventLayout (event: VesselEvent) =
 [<ReactComponent>]
 let VesselEvents id =
   let ctx, setCtx = Context.useCtx ()
-  let events, setEvents = React.useState<VesselEvent array> [||]
+  let events, setEvents = React.useState<Shared.Api.Shared.EventWrapper array> [||]
   React.useEffect (
     (fun _ ->
       match ctx.SelectedVessel with

@@ -13,6 +13,6 @@ let errorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) =
 
     match ex with
     | :? System.IO.IOException as x ->
-        let customError = { errorMsg = "Something terrible happened" }
+        let customError = { errorMsg = "Generic error happened" }
         Propagate customError
     | _ -> Ignore

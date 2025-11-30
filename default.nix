@@ -20,8 +20,8 @@ let
       version = builtins.readFile ./.version;
     in
     clean version;
-  dotnet-sdk = pkgs.dotnetCorePackages.sdk_8_0_3xx-bin;
-  dotnet-runtime = pkgs.dotnetCorePackages.aspnetcore_8_0;
+  dotnet-sdk = pkgs.dotnet-sdk_10;
+  dotnet-runtime = pkgs.dotnet-aspnetcore_10;
 in
 rec {
   shell = pkgs.mkShell {
