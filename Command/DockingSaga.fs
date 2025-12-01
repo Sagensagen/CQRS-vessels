@@ -291,7 +291,14 @@ let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (ma
             let! message = mailbox.Receive()
             let context = mailbox.Context
             let newState = handleMessage message state context |> Async.RunSynchronously
-            return! loop newState
+            match newState with
+            | Some s when s.CurrentStep.IsCompleted ->
+                logger.Error "Killing saga - Complete"
+                context.Stop(mailbox.Self)
+            | Some s when s.CurrentStep.IsFailed ->
+                logger.Error "Killing saga -  Faillure"
+                context.Stop(mailbox.Self)
+            | _ -> return! loop newState
         }
 
     logger.Information("Starting docking saga {SagaId} (in-memory)", sagaId)

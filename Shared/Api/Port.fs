@@ -40,7 +40,6 @@ type PortDTO = {
     Inserted: DateTimeOffset
 }
 
-// Error types for command operations
 type PortCommandErrors =
     | PortNotFound
     | PortAlreadyRegistered
@@ -50,9 +49,8 @@ type PortCommandErrors =
     | VesselNotDockedAtPort
     | ReservationNotFound
     | InvalidPortState of expected: string * actual: string
-    | CommandFailed of message: string
+    | CommandFailed of message: string // Generic message
 
-// Error types for query operations
 type PortQueryErrors =
     | PortNotFound
     | QueryFailed of message: string
