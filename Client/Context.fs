@@ -62,6 +62,7 @@ type ContextModel = {
   ThemeType: ThemeType
   ToastToUpdate: (ReactElement * IDispatchToastOptionsProp list) option
   ToastToDismiss: string
+  IsSimulating: bool
 }
 
 type ContextMsg =
@@ -72,6 +73,7 @@ type ContextMsg =
   | UpdateToast of (ReactElement * IDispatchToastOptionsProp list)
   | DismissToast of string
   | UpdateThemeType of ThemeType
+  | UpdateIsSimulating of bool
 
 let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   match msg with
@@ -82,6 +84,7 @@ let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   | UpdateToast toast -> {model with ToastToUpdate = Some toast}
   | DismissToast toastName -> {model with ToastToDismiss = toastName}
   | UpdateThemeType theme -> {model with ThemeType = theme}
+  | UpdateIsSimulating b -> {model with IsSimulating = b}
 
 let context = React.createContext ()
 
@@ -98,6 +101,7 @@ let ContextProvider (children: ReactElement list) =
     ThemeType = Light
     ToastToUpdate = None
     ToastToDismiss = ""
+    IsSimulating = false
   }
   let ctx, ctxDispatch = React.useReducer (UpdateContext, initContext ())
 

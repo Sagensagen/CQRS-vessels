@@ -508,20 +508,25 @@ let SideBar () =
               ]
               Fui.card [
                 card.onClick (fun _ ->
-                  let simConfig: SimulationConfig = {
-                    VesselCount = 10
-                    PortCount = 3
-                    OperationDelayMs = 2000
-                    DockDurationMs = 5000
-                  }
-                  ApiClient.Simulation.ExecuteSimulation simConfig
-                  |> Async.StartAsPromise
-                  |> Promise.tap (fun res ->
-                    match res with
-                    | Ok () -> ()
-                    | Error e -> ()
-                  )
-                  |> Promise.catchEnd (fun _ -> ())
+                  UpdateIsSimulating (not ctx.IsSimulating) |> setCtx
+                  if ctx.IsSimulating then
+                    ApiClient.Simulation.StopSimulation ()
+                    |> Async.StartAsPromise
+                    |> Promise.tap (fun res ->
+                      match res with
+                      | Ok () -> ()
+                      | Error e -> ()
+                    )
+                    |> Promise.catchEnd (fun _ -> ())
+                  else
+                    ApiClient.Simulation.ExecuteSimulation 100
+                    |> Async.StartAsPromise
+                    |> Promise.tap (fun res ->
+                      match res with
+                      | Ok () -> ()
+                      | Error e -> ()
+                    )
+                    |> Promise.catchEnd (fun _ -> ())
                 )
                 card.appearance.subtle
                 card.children [
@@ -532,8 +537,16 @@ let SideBar () =
                       style.gap 10
                     ]
                     prop.children [
-                      Fui.icon.connectedRegular [icon.size.``24``]
-                      Fui.text.body1Strong "Simulate"
+                      if ctx.IsSimulating then
+                        Fui.icon.connectedFilled [
+                          icon.size.``24``
+                          icon.primaryFill Theme.tokens.colorStatusDangerBackground2
+                        ]
+                        Fui.text.body1Strong "Stop simulation"
+                        Fui.spinner [spinner.size.tiny]
+                      else
+                        Fui.icon.connectedRegular [icon.size.``24``]
+                        Fui.text.body1Strong "Simulate"
                     ]
                   ]
                 ]

@@ -37,10 +37,33 @@ let getPorts (callback: PortDTO array -> unit) setCtx =
 let private Application () =
   let ctx, setCtx = Context.useCtx ()
 
-  React.useEffectOnce (fun _ ->
-    getVessels (UpdateAllVessels >> setCtx) setCtx
-    getPorts (UpdateAllPorts >> setCtx) setCtx
+  let (data, setData) = React.useState (None: string option)
+
+  // Run once on mount
+  React.useEffect (
+    (fun _ ->
+      let pollTimer =
+        Browser.Dom.window.setInterval (
+          (fun _ ->
+            getVessels (UpdateAllVessels >> setCtx) setCtx
+            getPorts (UpdateAllPorts >> setCtx) setCtx
+          ),
+          5000,
+          []
+        )
+
+      {new System.IDisposable with
+        member __.Dispose () =
+          Browser.Dom.window.clearInterval pollTimer
+      }
+    ),
+    [||]
   )
+
+  // React.useEffectOnce (fun _ ->
+  //   getVessels (UpdateAllVessels >> setCtx) setCtx
+  //   getPorts (UpdateAllPorts >> setCtx) setCtx
+  // )
   React.router [
     router.hashMode
     router.children [
