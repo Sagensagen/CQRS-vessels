@@ -4,6 +4,7 @@ open System
 open FS.FluentUI
 open Feliz
 open Shared.Api.Port
+open Shared.Api.Simulation
 open Shared.Api.Vessel
 
 let maritimeBlueBrands = {
@@ -58,10 +59,13 @@ type ContextModel = {
   AllVessels: VesselDTO array
   SelectedVessel: VesselDTO option
   AllPorts: PortDTO array
+  PortStatistics: PortStatistics option
+  VesselStatistics: VesselStatistics option
   SelectedView: SelectedView
   ThemeType: ThemeType
   ToastToUpdate: (ReactElement * IDispatchToastOptionsProp list) option
   ToastToDismiss: string
+  IsSimulating: bool
 }
 
 type ContextMsg =
@@ -69,19 +73,25 @@ type ContextMsg =
   | UpdateSelectedVessel of VesselDTO option
   | UpdateAllPorts of PortDTO array
   | UpdateSelectedView of SelectedView
+  | UpdatePortStatistics of PortStatistics option
+  | UpdateVesselStatistics of VesselStatistics option
   | UpdateToast of (ReactElement * IDispatchToastOptionsProp list)
   | DismissToast of string
   | UpdateThemeType of ThemeType
+  | UpdateIsSimulating of bool
 
 let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   match msg with
   | UpdateAllVessels vessels -> {model with AllVessels = vessels}
   | UpdateSelectedVessel vessel -> {model with SelectedVessel = vessel}
   | UpdateAllPorts ports -> {model with AllPorts = ports}
+  | UpdatePortStatistics stats -> {model with PortStatistics = stats}
+  | UpdateVesselStatistics stats -> {model with VesselStatistics = stats}
   | UpdateSelectedView vessel -> {model with SelectedView = vessel}
   | UpdateToast toast -> {model with ToastToUpdate = Some toast}
   | DismissToast toastName -> {model with ToastToDismiss = toastName}
   | UpdateThemeType theme -> {model with ThemeType = theme}
+  | UpdateIsSimulating b -> {model with IsSimulating = b}
 
 let context = React.createContext ()
 
@@ -94,10 +104,13 @@ let ContextProvider (children: ReactElement list) =
     AllVessels = [||]
     SelectedVessel = None
     AllPorts = [||]
+    PortStatistics = None
+    VesselStatistics = None
     SelectedView = FleetMap
     ThemeType = Light
     ToastToUpdate = None
     ToastToDismiss = ""
+    IsSimulating = false
   }
   let ctx, ctxDispatch = React.useReducer (UpdateContext, initContext ())
 

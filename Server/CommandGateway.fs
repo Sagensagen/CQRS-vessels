@@ -17,7 +17,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
 
     let getOrCreateVesselActor (vesselId: Guid) =
         let actorName = sprintf "vessel-%s" (vesselId.ToString())
-        let actorPath = actorSystem.ActorSelection(sprintf "/user/%s" actorName)
+        let actorPath = actorSystem.ActorSelection($"/user/{actorName}")
 
         try
             actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result
@@ -26,7 +26,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
 
     let getOrCreatePortActor (portId: Guid) =
         let actorName = sprintf "port-%s" (portId.ToString())
-        let actorPath = actorSystem.ActorSelection(sprintf "/user/%s" actorName)
+        let actorPath = actorSystem.ActorSelection($"/user/{actorName}")
 
         try
             actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result
@@ -35,8 +35,9 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
 
     let getSagaCoordinator () =
         let actorName = "saga-coordinator"
-        let actorPath = actorSystem.ActorSelection(sprintf "/user/%s" actorName)
+        let actorPath = actorSystem.ActorSelection($"/user/{actorName}")
 
+        // Try resolve or create the saga-coordinator
         try
             actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result
         with _ ->
@@ -325,7 +326,6 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             try
                 logger.Information("Starting docking saga for vessel {VesselId} at port {PortId}", vesselId, portId)
 
-                // Pre-create actors to ensure they exist before saga starts
                 let vesselActor = getOrCreateVesselActor vesselId
                 let portActor = getOrCreatePortActor portId
 
@@ -335,7 +335,6 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                     portActor.Path.ToString()
                 )
 
-                // Validate port actor is ready and has valid state
                 let! portStateResponse =
                     portActor.Ask<PortActor.PortStateResponse>(PortActor.PortActorMessage.GetState, commandTimeout)
 
@@ -345,6 +344,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                     logger.Warning("Cannot start docking saga - Port {PortId} has not been registered", portId)
                     return! Error Shared.Api.Vessel.VesselCommandErrors.PortNotFound
                 | PortActor.PortExists portState ->
+
                     // Validate port can accept reservations
                     if portState.Status <> Shared.Api.Port.PortStatus.Open then
                         logger.Warning(

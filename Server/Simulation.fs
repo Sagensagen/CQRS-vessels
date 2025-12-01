@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open Marten
 open Microsoft.AspNetCore.Http
 open Serilog
 open Shared.Api.Vessel
@@ -12,24 +13,176 @@ open Fable.Remoting.Giraffe
 open Giraffe
 open Shared.Api.Simulation
 
+type private Port =
+    { Name: string
+      Latitude: float
+      Longitude: float }
+
+let private ports: Port list =
+    [ { Name = "Port of Shanghai, China"
+        Latitude = 31.22
+        Longitude = 121.48 }
+      { Name = "Yangshan Port, China"
+        Latitude = 30.6294
+        Longitude = 122.0577 }
+      { Name = "Port of Singapore, Singapore"
+        Latitude = 1.264
+        Longitude = 103.820 }
+      { Name = "Port of Hong Kong, Hong Kong"
+        Latitude = 22.317
+        Longitude = 114.170 }
+      { Name = "Port of Busan, South Korea"
+        Latitude = 35.10
+        Longitude = 129.04 }
+      { Name = "Port of Yokohama, Japan"
+        Latitude = 35.27
+        Longitude = 139.38 }
+      { Name = "Port of Los Angeles, USA"
+        Latitude = 33.7428
+        Longitude = -118.2614 }
+      { Name = "Port of Long Beach, USA"
+        Latitude = 33.75
+        Longitude = -118.20 }
+      { Name = "Port of Rotterdam, Netherlands"
+        Latitude = 51.95
+        Longitude = 4.14 }
+      { Name = "Port of Antwerp-Bruges, Belgium"
+        Latitude = 51.22
+        Longitude = 4.40 }
+      { Name = "Port of Barcelona, Spain"
+        Latitude = 41.346176
+        Longitude = 2.168365 }
+      { Name = "Port of Gothenburg, Sweden"
+        Latitude = 57.7
+        Longitude = 11.9 }
+      { Name = "Port of Jebel Ali (Dubai), UAE"
+        Latitude = 25.0033
+        Longitude = 55.0521 }
+      { Name = "Port of Djibouti, Djibouti"
+        Latitude = 11.59
+        Longitude = 43.15 }
+      { Name = "Port of Callao, Peru"
+        Latitude = -12.05
+        Longitude = -77.15 }
+      { Name = "Port of Tianjin, China"
+        Latitude = 39.0
+        Longitude = 117.7 }
+      { Name = "Port of Shenzhen, China"
+        Latitude = 22.5
+        Longitude = 114.0 }
+      { Name = "Port of Qingdao, China"
+        Latitude = 36.07
+        Longitude = 120.38 }
+      { Name = "Port of Guangzhou, China"
+        Latitude = 23.10
+        Longitude = 113.25 }
+      { Name = "Port of Durban, South Africa"
+        Latitude = -29.88
+        Longitude = 31.02 }
+      { Name = "Port of Santos, Brazil"
+        Latitude = -23.96
+        Longitude = -46.33 }
+      { Name = "Port of Buenos Aires, Argentina"
+        Latitude = -34.6
+        Longitude = -58.4 }
+      { Name = "Port of Valparaiso, Chile"
+        Latitude = -33.05
+        Longitude = -71.63 }
+      { Name = "Port of Vancouver, Canada"
+        Latitude = 49.3
+        Longitude = -123.1 }
+      { Name = "Port of Seattle, USA"
+        Latitude = 47.6
+        Longitude = -122.33 }
+      { Name = "Port of Hamburg, Germany"
+        Latitude = 53.55
+        Longitude = 9.99 }
+      { Name = "Port of Marseille, France"
+        Latitude = 43.3
+        Longitude = 5.37 }
+      { Name = "Port of Piraeus, Greece"
+        Latitude = 37.94
+        Longitude = 23.64 }
+      { Name = "Port of Alexandria, Egypt"
+        Latitude = 31.2
+        Longitude = 29.9 }
+      { Name = "Port of Mombasa, Kenya"
+        Latitude = -4.05
+        Longitude = 39.66 }
+      { Name = "Port of Lagos (Apapa), Nigeria"
+        Latitude = 6.45
+        Longitude = 3.40 }
+      { Name = "Port of Colombo, Sri Lanka"
+        Latitude = 6.93
+        Longitude = 79.85 }
+      { Name = "Port of Karachi, Pakistan"
+        Latitude = 24.835596
+        Longitude = 66.981445 }
+      { Name = "Port of Mumbai (Nhava Sheva), India"
+        Latitude = 18.94
+        Longitude = 72.83 }
+      { Name = "Port of Ho Chi Minh City, Vietnam"
+        Latitude = 10.82
+        Longitude = 106.63 }
+      { Name = "Port of Jakarta (Tanjung Priok), Indonesia"
+        Latitude = -6.12
+        Longitude = 106.85 }
+      { Name = "Port of Manila, Philippines"
+        Latitude = 14.58
+        Longitude = 120.97 }
+      { Name = "Port of Sydney, Australia"
+        Latitude = -33.86
+        Longitude = 151.20 }
+      { Name = "Port of Melbourne, Australia"
+        Latitude = -37.82
+        Longitude = 144.96 }
+      { Name = "Port of Genoa, Italy"
+        Latitude = 44.40
+        Longitude = 8.93 }
+      { Name = "Port of Trieste, Italy"
+        Latitude = 45.65
+        Longitude = 13.76 }
+      { Name = "Port of Istanbul, Turkey"
+        Latitude = 41.0
+        Longitude = 28.97 }
+      { Name = "Port of Haifa, Israel"
+        Latitude = 32.82
+        Longitude = 34.99 }
+      { Name = "Port of Beirut, Lebanon"
+        Latitude = 33.90
+        Longitude = 35.52 }
+      { Name = "Port of Montreal, Canada"
+        Latitude = 45.50
+        Longitude = -73.55 }
+      { Name = "Port of New York/New Jersey, USA"
+        Latitude = 40.67
+        Longitude = -74.04 }
+      { Name = "Port of Savannah, USA"
+        Latitude = 32.08
+        Longitude = -81.10 }
+      { Name = "Port of Houston, USA"
+        Latitude = 29.73
+        Longitude = -95.27 }
+      { Name = "Port of Auckland, New Zealand"
+        Latitude = -36.84
+        Longitude = 174.76 }
+      { Name = "Port of Wellington, New Zealand"
+        Latitude = -41.29
+        Longitude = 174.78 } ]
+
 type VesselState =
     | AtSea
     | Docked of portId: Guid
+// | // Extend these with Cargo activities or something later?
 
 type SimulatedVessel =
     { VesselId: Guid
       Name: string
       State: VesselState }
 
-type private Port =
-    { Name: string
-      Latitude: float
-      Longitude: float }
-
 let private random = Random()
 
-let private randomName prefix =
-    sprintf "%s-%d" prefix (random.Next(1000, 9999))
+let private randomName prefix = $"{prefix}-{(random.Next(1000, 9999))}"
 
 let private randomPosition () =
     { Latitude = (random.NextDouble() * 180.0) - 90.0
@@ -41,11 +194,20 @@ let private randomVesselType () =
     types.[random.Next(types.Length)]
 
 
+
+/// <summary>
+/// Recursive simulation of a single vessels events. A new event is triggered when the first one in finished
+/// </summary>
+/// <param name="vessel"></param>
+/// <param name="ports"></param>
+/// <param name="gateway"></param>
+/// <param name="vesselCount"></param>
+/// <param name="cts"></param>
 let rec private simulateVessel
     (vessel: SimulatedVessel)
     (ports: Guid array)
     (gateway: CommandGateway.CommandGateway)
-    (config: SimulationConfig)
+    (vesselCount: int)
     (cts: CancellationToken)
     =
     task {
@@ -56,27 +218,51 @@ let rec private simulateVessel
             else
                 match vessel.State with
                 | AtSea ->
-                    // At sea: randomly dock at a port
-                    let portId = ports.[random.Next(ports.Length)]
-                    Log.Information("{VesselName} requesting to dock at port {PortId}", vessel.Name, portId)
+                    // At sea: randomly dock at a port or move position
+                    if random.Next(100) < 30 then
+                        let position =
+                            { Latitude = (random.NextDouble() * 180.0) - 90.0
+                              Longitude = (random.NextDouble() * 180.0) - 90.0
+                              Timestamp = DateTimeOffset.UtcNow }
 
-                    let! result = gateway.StartDockingSaga(vessel.VesselId, portId, Some "Simulation")
+                        let! res = gateway.UpdateVesselPosition(vessel.VesselId, position, Some "API.UpdatePosition")
 
-                    match result with
-                    | Ok sagaId ->
-                        Log.Information("{VesselName} successfully docked (Saga: {SagaId})", vessel.Name, sagaId)
-                        let dockedVessel = { vessel with State = Docked portId }
+                        match res with
+                        | Ok _dontCare ->
+                            Log.Information("{VesselName} successfully Moved position)", vessel.Name)
 
-                        // Wait while docked
-                        do! Task.Delay(config.DockDurationMs, cts)
+                            // Wait while docked
+                            do! Task.Delay(random.Next(1000, 15000), cts)
 
-                        return! simulateVessel dockedVessel ports gateway config cts
-                    | Error err ->
-                        Log.Warning("{VesselName} failed to dock: {Error}", vessel.Name, err)
+                            return! simulateVessel vessel ports gateway vesselCount cts
+                        | Error err ->
+                            Log.Warning("{VesselName} failed to move position: {Error}", vessel.Name, err)
 
-                        // Wait and try again
-                        do! Task.Delay(config.OperationDelayMs, cts)
-                        return! simulateVessel vessel ports gateway config cts
+                            // Wait and try again
+                            do! Task.Delay(random.Next(1000, 15000), cts)
+                            return! simulateVessel vessel ports gateway vesselCount cts
+
+                    else
+                        let portId = ports.[random.Next(ports.Length)]
+                        Log.Information("{VesselName} requesting to dock at port {PortId}", vessel.Name, portId)
+
+                        let! result = gateway.StartDockingSaga(vessel.VesselId, portId, Some "Simulation")
+
+                        match result with
+                        | Ok sagaId ->
+                            Log.Information("{VesselName} successfully docked (Saga: {SagaId})", vessel.Name, sagaId)
+                            let dockedVessel = { vessel with State = Docked portId }
+
+                            // Wait while docked
+                            do! Task.Delay(random.Next(1000, 15000), cts)
+
+                            return! simulateVessel dockedVessel ports gateway vesselCount cts
+                        | Error err ->
+                            Log.Warning("{VesselName} failed to dock: {Error}", vessel.Name, err)
+
+                            // Wait and try again
+                            do! Task.Delay(random.Next(1000, 15000), cts)
+                            return! simulateVessel vessel ports gateway vesselCount cts
 
                 | Docked portId ->
                     // Docked: request departure
@@ -90,15 +276,15 @@ let rec private simulateVessel
                         let atSeaVessel = { vessel with State = AtSea }
 
                         // Wait before next operation
-                        do! Task.Delay(config.OperationDelayMs, cts)
+                        do! Task.Delay(random.Next(1000, 15000), cts)
 
-                        return! simulateVessel atSeaVessel ports gateway config cts
+                        return! simulateVessel atSeaVessel ports gateway vesselCount cts
                     | Error err ->
                         Log.Warning("{VesselName} failed to depart: {Error}", vessel.Name, err)
 
                         // Wait and try again
-                        do! Task.Delay(config.OperationDelayMs, cts)
-                        return! simulateVessel vessel ports gateway config cts
+                        do! Task.Delay(random.Next(1000, 15000), cts)
+                        return! simulateVessel vessel ports gateway vesselCount cts
         with
         | :? OperationCanceledException ->
             Log.Information("Vessel {VesselName} simulation cancelled", vessel.Name)
@@ -108,47 +294,42 @@ let rec private simulateVessel
             return ()
     }
 
-let private runSimulation (gateway: CommandGateway.CommandGateway) (config: SimulationConfig) (cts: CancellationToken) =
+let private runSimulation (gateway: CommandGateway.CommandGateway) (vesselCount: int) (cts: CancellationToken) =
     task {
         try
-            Log.Information(
-                "Starting load simulation with {VesselCount} vessels and {PortCount} ports",
-                config.VesselCount,
-                config.PortCount
-            )
-
             // Create ports
-            Log.Information("Creating {PortCount} ports...", config.PortCount)
+            Log.Information("Creating {PortCount} ports...", 10) // TODO cleanup
 
             let! portIds =
                 task {
                     let portTasks =
-                        [| for i in 1 .. config.PortCount do
-                               task {
-                                   let portId = Guid.NewGuid()
+                        ports
+                        |> List.map (fun p ->
+                            task {
+                                let portId = Guid.NewGuid()
 
-                                   let! result =
-                                       gateway.RegisterPort(
-                                           portId,
-                                           randomName "Port",
-                                           None,
-                                           "Simulation",
-                                           (random.NextDouble() * 180.0) - 90.0,
-                                           (random.NextDouble() * 360.0) - 180.0,
-                                           None,
-                                           random.Next(5, 20), // 5-20 docks per port
-                                           Some "Simulation"
-                                       )
+                                let! result =
+                                    gateway.RegisterPort(
+                                        portId,
+                                        p.Name,
+                                        None,
+                                        "Simulation",
+                                        p.Latitude,
+                                        p.Longitude,
+                                        None,
+                                        random.Next(2, 4),
+                                        Some "Simulation"
+                                    )
 
-                                   match result with
-                                   | Ok _ ->
-                                       // Open the port
-                                       let! openResult = gateway.OpenPort(portId, Some "Simulation")
-                                       return Some portId
-                                   | Error err ->
-                                       Log.Warning("Failed to create port: {Error}", err)
-                                       return None
-                               } |]
+                                match result with
+                                | Ok _ ->
+                                    // Open the port
+                                    let! openResult = gateway.OpenPort(portId, Some "Simulation")
+                                    return Some portId
+                                | Error err ->
+                                    Log.Warning("Failed to create port: {Error}", err)
+                                    return None
+                            })
 
                     let! results = Task.WhenAll(portTasks)
                     return results |> Array.choose id
@@ -161,43 +342,45 @@ let private runSimulation (gateway: CommandGateway.CommandGateway) (config: Simu
                 return ()
             else
                 // Create and register vessels
-                Log.Information("Creating {VesselCount} vessels...", config.VesselCount)
+                Log.Information("Creating {VesselCount} vessels...", vesselCount)
 
                 let! vessels =
                     task {
                         let vesselTasks =
-                            [| for i in 1 .. config.VesselCount do
-                                   task {
-                                       let vesselId = Guid.NewGuid()
-                                       let vesselName = randomName "Vessel"
 
-                                       let! result =
-                                           gateway.RegisterVessel(
-                                               vesselId,
-                                               vesselName,
-                                               random.Next(100000000, 999999999),
-                                               Some(random.Next(1000000, 9999999)),
-                                               "SIM",
-                                               randomPosition (),
-                                               Some(random.NextDouble() * 200.0 + 50.0),
-                                               Some(random.NextDouble() * 30.0 + 10.0),
-                                               Some(random.NextDouble() * 10.0 + 5.0),
-                                               randomVesselType (),
-                                               random.Next(10, 50),
-                                               Some "Simulation"
-                                           )
+                            [ 1..vesselCount ]
+                            |> List.map (fun v ->
+                                task {
+                                    let vesselId = Guid.NewGuid()
+                                    let vesselName = randomName "Vessel"
 
-                                       match result with
-                                       | Ok _ ->
-                                           return
-                                               Some
-                                                   { VesselId = vesselId
-                                                     Name = vesselName
-                                                     State = AtSea }
-                                       | Error err ->
-                                           Log.Warning("Failed to create vessel: {Error}", err)
-                                           return None
-                                   } |]
+                                    let! result =
+                                        gateway.RegisterVessel(
+                                            vesselId,
+                                            vesselName,
+                                            random.Next(100000000, 999999999),
+                                            Some(random.Next(1000000, 9999999)),
+                                            "SIM",
+                                            randomPosition (),
+                                            Some(random.NextDouble() * 200.0 + 50.0),
+                                            Some(random.NextDouble() * 30.0 + 10.0),
+                                            Some(random.NextDouble() * 10.0 + 5.0),
+                                            randomVesselType (),
+                                            random.Next(10, 50),
+                                            Some "Simulation"
+                                        )
+
+                                    match result with
+                                    | Ok _ ->
+                                        return
+                                            Some
+                                                { VesselId = vesselId
+                                                  Name = vesselName
+                                                  State = AtSea }
+                                    | Error err ->
+                                        Log.Warning("Failed to create vessel: {Error}", err)
+                                        return None
+                                })
 
                         let! results = Task.WhenAll(vesselTasks)
                         return results |> Array.choose id
@@ -209,10 +392,9 @@ let private runSimulation (gateway: CommandGateway.CommandGateway) (config: Simu
                 Log.Information("Starting vessel simulators...")
 
                 let simulationTasks =
-                    [| for vessel in vessels -> simulateVessel vessel portIds gateway config cts |]
+                    vessels |> Array.map (fun v -> simulateVessel v portIds gateway vesselCount cts)
 
-                // Wait for all simulations to complete (or be cancelled)
-                let! _ = Task.WhenAll(simulationTasks)
+                let! _ = Task.WhenAll(simulationTasks) // :fire:
 
                 Log.Information("Load simulation completed")
         with
@@ -220,33 +402,42 @@ let private runSimulation (gateway: CommandGateway.CommandGateway) (config: Simu
         | ex -> Log.Error(ex, "Error in load simulation")
     }
 
-let private createDefaultConfig () =
-    { VesselCount = 10
-      PortCount = 3
-      OperationDelayMs = 2000
-      DockDurationMs = 5000 }
+let mutable Current: (Task * CancellationTokenSource) option = None
 
-let private startSimulation (gateway: CommandGateway.CommandGateway) (config: SimulationConfig option) =
-    let cfg = config |> Option.defaultValue (createDefaultConfig ())
+let private startSimulation (gateway: CommandGateway.CommandGateway) (vesselCount: int) =
     let cts = new CancellationTokenSource()
-
-    let simulationTask = runSimulation gateway cfg cts.Token
-
-    // Return cancellation token source so caller can stop simulation
+    let simulationTask = runSimulation gateway vesselCount cts.Token
     (simulationTask, cts)
 
 
 let simulationApi (ctx: HttpContext) : Shared.Api.Simulation.ISimulationApi =
+    let querySession = ctx.GetService<IQuerySession>()
+
     { ExecuteSimulation =
-        fun (config: SimulationConfig) ->
+        fun (vesselCount: int) ->
             asyncResult {
                 let commandGateway = ctx.GetService<CommandGateway.CommandGateway>()
-                do startSimulation commandGateway (Some config) |> ignore
+                // Make this an actor on its own?
+                let task, cts = startSimulation commandGateway vesselCount
+
+                Current <- Some(task, cts)
 
                 return ()
-            } }
+            }
+      StopSimulation =
+        fun () ->
+            asyncResult {
+                match Current with
+                | Some(_, cts) ->
+                    cts.Cancel()
+                    Current <- None
+                    return ()
+                | None -> return ()
+            }
+      GetPortStatistics = fun () -> Query.QueryHandlers.getPortStatistics querySession
+      GetVesselStatistics = fun () -> Query.QueryHandlers.getVesselStatistics querySession }
 
-let simuationHandler: HttpHandler =
+let simulationHandler: HttpHandler =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder RemotingHelpers.routeBuilder
     |> Remoting.fromContext simulationApi

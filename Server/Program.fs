@@ -10,10 +10,9 @@ open Microsoft.Extensions.DependencyInjection
 open Serilog
 
 module Program =
-    let exitCode = 0
 
     let webApp =
-        choose [ Api.Vessel.vesselHandler; Api.Port.portHandler; Simulation.simuationHandler ]
+        choose [ Api.Vessel.vesselHandler; Api.Port.portHandler; Simulation.simulationHandler ]
 
     [<EntryPoint>]
     let main args =
@@ -44,7 +43,7 @@ module Program =
 
             app.Run()
 
-            exitCode
+            0
 
         with ex ->
             Log.Fatal(ex, "Application terminated unexpectedly")

@@ -7,7 +7,7 @@ open FS.FluentUI
 open Shared.Api.Vessel
 open Fable.Core
 
-let getVesselEvents (vesselId: Guid) (callback: Shared.Api.Shared.EventWrapper array -> unit) setCtx =
+let private getVesselEvents (vesselId: Guid) (callback: Shared.Api.Shared.EventWrapper array -> unit) setCtx =
   ApiClient.Vessel.GetEvents vesselId
   |> Async.StartAsPromise
   |> Promise.tap (fun res ->
