@@ -183,15 +183,17 @@ let getVesselStatistics (session: IQuerySession) =
             |> Seq.filter (fun v -> v.State = OperationalStatus.Decommissioned)
             |> Seq.length
 
-        return
-            {| Total = total
-               AtSea = atSea
-               Docked = docked
-               Decommissioned = decommissioned
-               Active = total - decommissioned |}
+        let stats =
+            { Total = total
+              AtSea = atSea
+              Docked = docked
+              Decommissioned = decommissioned
+              Active = total - decommissioned }
+            : Shared.Api.Simulation.VesselStatistics
+        return stats
     }
 
-let getPortStatistics (session: IQuerySession) =
+let getPortStatistics (session: IQuerySession) : Async<Result<Shared.Api.Simulation.PortStatistics, string>> =
     asyncResult {
         let! ports = session.Query<PortReadModel>().ToListAsync() |> Async.AwaitTask
 
@@ -201,19 +203,21 @@ let getPortStatistics (session: IQuerySession) =
         let closed =
             ports |> Seq.filter (fun p -> p.Status = PortStatus.Closed) |> Seq.length
 
-        let totalDocks = ports |> Seq.sumBy (fun p -> p.MaxDocks)
-        let occupiedDocks = ports |> Seq.sumBy (fun p -> p.CurrentDocked)
+        let totalDocks = ports |> Seq.sumBy _.MaxDocks
+        let occupiedDocks = ports |> Seq.sumBy _.CurrentDocked
 
-        return
-            {| Total = total
-               Open = open'
-               Closed = closed
-               TotalDocks = totalDocks
-               OccupiedDocks = occupiedDocks
-               AvailableDocks = totalDocks - occupiedDocks
-               OccupancyRate =
+        let stats: Shared.Api.Simulation.PortStatistics =
+            { Total = total
+              Open = open'
+              Closed = closed
+              AvailableDocks = totalDocks - occupiedDocks
+              TotalDocks = totalDocks
+              OccupiedDocks = occupiedDocks
+              OccupancyRate =
                 if totalDocks > 0 then
                     (float occupiedDocks / float totalDocks) * 100.0
                 else
-                    0.0 |}
+                    0.0 }
+
+        return stats
     }

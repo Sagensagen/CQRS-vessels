@@ -4,6 +4,7 @@ open System
 open FS.FluentUI
 open Feliz
 open Shared.Api.Port
+open Shared.Api.Simulation
 open Shared.Api.Vessel
 
 let maritimeBlueBrands = {
@@ -58,6 +59,8 @@ type ContextModel = {
   AllVessels: VesselDTO array
   SelectedVessel: VesselDTO option
   AllPorts: PortDTO array
+  PortStatistics: PortStatistics option
+  VesselStatistics: VesselStatistics option
   SelectedView: SelectedView
   ThemeType: ThemeType
   ToastToUpdate: (ReactElement * IDispatchToastOptionsProp list) option
@@ -70,6 +73,8 @@ type ContextMsg =
   | UpdateSelectedVessel of VesselDTO option
   | UpdateAllPorts of PortDTO array
   | UpdateSelectedView of SelectedView
+  | UpdatePortStatistics of PortStatistics option
+  | UpdateVesselStatistics of VesselStatistics option
   | UpdateToast of (ReactElement * IDispatchToastOptionsProp list)
   | DismissToast of string
   | UpdateThemeType of ThemeType
@@ -80,6 +85,8 @@ let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   | UpdateAllVessels vessels -> {model with AllVessels = vessels}
   | UpdateSelectedVessel vessel -> {model with SelectedVessel = vessel}
   | UpdateAllPorts ports -> {model with AllPorts = ports}
+  | UpdatePortStatistics stats -> {model with PortStatistics = stats}
+  | UpdateVesselStatistics stats -> {model with VesselStatistics = stats}
   | UpdateSelectedView vessel -> {model with SelectedView = vessel}
   | UpdateToast toast -> {model with ToastToUpdate = Some toast}
   | DismissToast toastName -> {model with ToastToDismiss = toastName}
@@ -97,6 +104,8 @@ let ContextProvider (children: ReactElement list) =
     AllVessels = [||]
     SelectedVessel = None
     AllPorts = [||]
+    PortStatistics = None
+    VesselStatistics = None
     SelectedView = FleetMap
     ThemeType = Light
     ToastToUpdate = None

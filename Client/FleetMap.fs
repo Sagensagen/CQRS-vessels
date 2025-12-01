@@ -5,6 +5,45 @@ open FS.FluentUI
 open Feliz
 open Feliz.PigeonMaps
 
+// Shows statistics of all the ports and vessels in the mixer
+[<ReactComponent>]
+let private StatisticsPanel () =
+  let ctx, _setCtx = Context.useCtx ()
+  Html.div [
+    prop.style [
+      style.position.absolute
+      style.top 15
+      style.right 15
+      style.zIndex 9999
+      style.backgroundColor "rgba(0,0,0,0.6)"
+      style.color.white
+      style.padding 10
+      style.display.flex
+      style.flexDirection.column
+    ]
+    prop.children [
+      match ctx.PortStatistics, ctx.VesselStatistics with
+      | Some portStats, Some vesselStats ->
+        Fui.text.subtitle2 "Port stats"
+        Fui.text $"Total ports: {portStats.Total}"
+        Fui.text $"Available docks: {portStats.AvailableDocks}"
+        Fui.text $"Closed ports: {portStats.Closed}"
+        Fui.text $"Open ports: {portStats.Open}"
+        Fui.text $"Occupancy rate: %.2f{portStats.OccupancyRate}%%"
+        Fui.text $"Occupied docks: {portStats.OccupiedDocks}"
+        Fui.text $"Total docks: {portStats.TotalDocks}"
+        Html.div [Fui.divider []]
+        Fui.text.subtitle2 "Vessel stats"
+        Fui.text $"Total vessels: {vesselStats.Total}"
+        Fui.text $"Active vessels: {vesselStats.Active}"
+        Fui.text $"Docked vessels: {vesselStats.Docked}"
+        Fui.text $"Vessels at sea: {vesselStats.AtSea}"
+        Fui.text $"Decommissioned vessels: {vesselStats.Decommissioned}"
+      | _ -> Fui.spinner []
+
+    ]
+  ]
+
 [<ReactComponent>]
 let FleetMap () =
   let ctx, setCtx = Context.useCtx ()
@@ -15,6 +54,7 @@ let FleetMap () =
       style.height (length.perc 100)
     ]
     card.children [
+      StatisticsPanel ()
       PigeonMaps.map [
         map.center (14.699243741693328, 114.26806853317845)
         map.zoom 5

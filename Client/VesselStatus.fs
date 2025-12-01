@@ -2,7 +2,6 @@ module Client.VesselStatus
 
 open System
 open Browser.Types
-open Fable.Parsimmon.Parsimmon
 open Feliz.PigeonMaps
 open Feliz
 open FS.FluentUI

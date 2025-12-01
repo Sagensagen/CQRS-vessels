@@ -4,6 +4,7 @@ open System
 open Browser.Types
 open Client.Context
 open FS.FluentUI.V8toV9
+open Fable.React
 open Feliz
 open FS.FluentUI
 open Shared.Api.Port
@@ -12,7 +13,7 @@ open Shared.Api.Vessel
 open Fable.Core
 
 [<ReactComponent>]
-let AddPortDialog () =
+let private AddPortDialog () =
   let _ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
@@ -175,7 +176,7 @@ let AddPortDialog () =
   ]
 
 [<ReactComponent>]
-let AddVesselDialog () =
+let private AddVesselDialog () =
   let _ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
@@ -358,7 +359,7 @@ let AddVesselDialog () =
 
 [<ReactComponent>]
 let private VesselDropdown (onSelect: VesselDTO option -> unit) =
-  let ctx, setCtx = Context.useCtx ()
+  let ctx, _setCtx = Context.useCtx ()
   Fui.field [
     field.label "Select vessel"
     field.children [
@@ -393,6 +394,136 @@ let private VesselDropdown (onSelect: VesselDTO option -> unit) =
                 option.children [Fui.text vessel.Name]
               ]
             )
+        ]
+      ]
+    ]
+  ]
+
+[<ReactComponent>]
+let SimulationDialog () =
+  let simulationForm, setSimulationForm = React.useState 0
+  let ctx, setCtx = Context.useCtx ()
+  let isOpen, setIsOpen = React.useState false
+  Fui.dialog [
+    dialog.open' isOpen
+    dialog.onOpenChange (fun (d: DialogOpenChangeData<MouseEvent>) -> setIsOpen d.``open``)
+    dialog.children [
+      Fui.dialogTrigger [
+        dialogTrigger.disableButtonEnhancement true
+        dialogTrigger.children (
+          Fui.card [
+            card.appearance.subtle
+            card.children [
+              Html.div [
+                prop.style [
+                  style.display.flex
+                  style.alignItems.center
+                  style.gap 10
+                ]
+                prop.children [
+                  if ctx.IsSimulating then
+                    Fui.icon.connectedFilled [
+                      icon.size.``24``
+                      icon.primaryFill Theme.tokens.colorStatusDangerBackground2
+                    ]
+                    Fui.text.body1Strong "Stop simulation"
+                    Fui.spinner [ spinner.size.tiny]
+                  else
+                    Fui.icon.connectedRegular [icon.size.``24``]
+                    Fui.text.body1Strong "Simulate"
+                ]
+              ]
+            ]
+          ]
+        )
+      ]
+      Fui.dialogSurface [
+        dialogSurface.children [
+          Fui.dialogBody [
+            Fui.dialogTitle [
+              dialogTitle.as'.h1
+              dialogTitle.text "Simulation config"
+            ]
+            Fui.dialogContent [
+              dialogContent.style [
+                style.display.flex
+                style.flexDirection.column
+                style.gap 25
+              ]
+              dialogContent.children [
+                if ctx.IsSimulating then
+                  Fui.button [
+                    button.text "Stop simulation"
+                    button.appearance.primary
+                    button.icon (Fui.icon.dismissRegular [])
+                    button.onClick (fun _ ->
+                      ApiClient.Simulation.StopSimulation ()
+                      |> Async.StartAsPromise
+                      |> Promise.tap (fun res ->
+                        match res with
+                        | Ok () ->
+                          setIsOpen false
+                          UpdateIsSimulating (not ctx.IsSimulating) |> setCtx
+                        | Error e -> ()
+                      )
+                      |> Promise.catchEnd (fun _ -> ())
+                    )
+                  ]
+                else
+                  Fui.text
+                    "This request will dispatch the given number of vessels into the system, and will randomly try to move, dock, undock. There are 50 ports created as well and can be full/available and will reject vessels trying to dock if the latter. Cap is 1000"
+                  Fui.field [
+                    field.validationMessage
+                      "Do not deploy too many vessels. The browser will not be happy rendering 10k vessels per 5sec."
+                    field.validationState.none
+                    field.label "Number of vessels"
+                    field.children [
+                      Fui.input [
+                        input.value simulationForm
+                        input.type'.number
+                        input.onChange (fun v ->
+                          if v >= 0 && v <= 1000 then
+                            setSimulationForm v
+                        )
+                      ]
+                    ]
+                  ]
+              ]
+            ]
+            if not ctx.IsSimulating then
+              Fui.dialogActions [
+                dialogActions.position.end'
+                dialogActions.children [
+                  Fui.dialogTrigger [
+                    dialogTrigger.disableButtonEnhancement true
+                    dialogTrigger.children (
+                      Fui.button [
+                        button.appearance.secondary
+                        button.text "Close"
+                      ]
+                    )
+                  ]
+                  Fui.button [
+                    button.icon (Fui.icon.rocketRegular [])
+                    button.disabled (0 = simulationForm)
+                    button.appearance.primary
+                    button.text "Start"
+                    button.onClick (fun _ ->
+                      ApiClient.Simulation.ExecuteSimulation simulationForm
+                      |> Async.StartAsPromise
+                      |> Promise.tap (fun res ->
+                        match res with
+                        | Ok () ->
+                          UpdateIsSimulating (not ctx.IsSimulating) |> setCtx
+                          setIsOpen false
+                        | Error e -> ()
+                      )
+                      |> Promise.catchEnd (fun _ -> ())
+                    )
+                  ]
+                ]
+              ]
+          ]
         ]
       ]
     ]
@@ -506,51 +637,8 @@ let SideBar () =
                   ]
                 ]
               ]
-              Fui.card [
-                card.onClick (fun _ ->
-                  UpdateIsSimulating (not ctx.IsSimulating) |> setCtx
-                  if ctx.IsSimulating then
-                    ApiClient.Simulation.StopSimulation ()
-                    |> Async.StartAsPromise
-                    |> Promise.tap (fun res ->
-                      match res with
-                      | Ok () -> ()
-                      | Error e -> ()
-                    )
-                    |> Promise.catchEnd (fun _ -> ())
-                  else
-                    ApiClient.Simulation.ExecuteSimulation 100
-                    |> Async.StartAsPromise
-                    |> Promise.tap (fun res ->
-                      match res with
-                      | Ok () -> ()
-                      | Error e -> ()
-                    )
-                    |> Promise.catchEnd (fun _ -> ())
-                )
-                card.appearance.subtle
-                card.children [
-                  Html.div [
-                    prop.style [
-                      style.display.flex
-                      style.alignItems.center
-                      style.gap 10
-                    ]
-                    prop.children [
-                      if ctx.IsSimulating then
-                        Fui.icon.connectedFilled [
-                          icon.size.``24``
-                          icon.primaryFill Theme.tokens.colorStatusDangerBackground2
-                        ]
-                        Fui.text.body1Strong "Stop simulation"
-                        Fui.spinner [spinner.size.tiny]
-                      else
-                        Fui.icon.connectedRegular [icon.size.``24``]
-                        Fui.text.body1Strong "Simulate"
-                    ]
-                  ]
-                ]
-              ]
+              SimulationDialog ()
+
               AddVesselDialog ()
               AddPortDialog ()
             ]

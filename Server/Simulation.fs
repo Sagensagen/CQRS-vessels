@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open Marten
 open Microsoft.AspNetCore.Http
 open Serilog
 open Shared.Api.Vessel
@@ -303,7 +304,6 @@ let private runSimulation (gateway: CommandGateway.CommandGateway) (vesselCount:
                 task {
                     let portTasks =
                         ports
-                        |> List.take 10
                         |> List.map (fun p ->
                             task {
                                 let portId = Guid.NewGuid()
@@ -411,6 +411,8 @@ let private startSimulation (gateway: CommandGateway.CommandGateway) (vesselCoun
 
 
 let simulationApi (ctx: HttpContext) : Shared.Api.Simulation.ISimulationApi =
+    let querySession = ctx.GetService<IQuerySession>()
+
     { ExecuteSimulation =
         fun (vesselCount: int) ->
             asyncResult {
@@ -431,9 +433,11 @@ let simulationApi (ctx: HttpContext) : Shared.Api.Simulation.ISimulationApi =
                     Current <- None
                     return ()
                 | None -> return ()
-            } }
+            }
+      GetPortStatistics = fun () -> Query.QueryHandlers.getPortStatistics querySession
+      GetVesselStatistics = fun () -> Query.QueryHandlers.getVesselStatistics querySession }
 
-let simuationHandler: HttpHandler =
+let simulationHandler: HttpHandler =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder RemotingHelpers.routeBuilder
     |> Remoting.fromContext simulationApi
