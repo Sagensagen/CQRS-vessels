@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="Api\Shared.fs" />
     <Compile Include="Api\Vessel.fs" />
+    <Compile Include="Api\Route.fs" />
     <Compile Include="Api\Simulation.fs" />
     <Compile Include="Api\Port.fs" />
   </ItemGroup>

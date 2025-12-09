@@ -190,6 +190,7 @@ let getVesselStatistics (session: IQuerySession) =
               Decommissioned = decommissioned
               Active = total - decommissioned }
             : Shared.Api.Simulation.VesselStatistics
+
         return stats
     }
 

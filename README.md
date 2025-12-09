@@ -41,5 +41,29 @@ bun fable
 ```bash
 dotnet run --project Server
 ```
+#### Populate ocean shapefiles into postgis
+Download shapeFile gemoetries https://osmdata.openstreetmap.de/data/water-polygons.html
 
+```bash
+shp2pgsql -I -D -s 4326 water_polygons.shp water | psql -h localhost -U postgres -p 5433 -d postgres
+```
+
+### Getting started with PostGIS
+Install the postgis/enable it at least
+```sql
+CREATE EXTENSION postgis;
+```
+Populate the polygon dataset of global waters
+```bash
+shp2pgsql -I -D -s 4326 water_polygons.shp water | psql -h localhost -U postgres -p 5433 -d postgres
+```
+Create a grid from the polygons. Shortes paths need a grid network of edges, and polygons does not really make sense. Create single points from these
+```sql
+CREATE TABLE grid AS
+SELECT (ST_HexagonGrid(0.1, ST_Extent(geom))).*
+FROM water;
+```
+#### Other
+For plotting route: latLong [] https://tbensky.github.io/Maps/points.html
+Fast link for Google maps https://www.google.com/maps
 

@@ -4,6 +4,7 @@ open System
 open FS.FluentUI
 open Feliz
 open Shared.Api.Port
+open Shared.Api.Route
 open Shared.Api.Simulation
 open Shared.Api.Vessel
 
@@ -59,6 +60,7 @@ type ContextModel = {
   AllVessels: VesselDTO array
   SelectedVessel: VesselDTO option
   AllPorts: PortDTO array
+  CurrentRoute: Shared.Api.Route.LatLong array
   PortStatistics: PortStatistics option
   VesselStatistics: VesselStatistics option
   SelectedView: SelectedView
@@ -72,6 +74,7 @@ type ContextMsg =
   | UpdateAllVessels of VesselDTO array
   | UpdateSelectedVessel of VesselDTO option
   | UpdateAllPorts of PortDTO array
+  | UpdateCurrentRoute of LatLong array
   | UpdateSelectedView of SelectedView
   | UpdatePortStatistics of PortStatistics option
   | UpdateVesselStatistics of VesselStatistics option
@@ -85,6 +88,7 @@ let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   | UpdateAllVessels vessels -> {model with AllVessels = vessels}
   | UpdateSelectedVessel vessel -> {model with SelectedVessel = vessel}
   | UpdateAllPorts ports -> {model with AllPorts = ports}
+  | UpdateCurrentRoute r -> {model with CurrentRoute = r}
   | UpdatePortStatistics stats -> {model with PortStatistics = stats}
   | UpdateVesselStatistics stats -> {model with VesselStatistics = stats}
   | UpdateSelectedView vessel -> {model with SelectedView = vessel}
@@ -104,6 +108,7 @@ let ContextProvider (children: ReactElement list) =
     AllVessels = [||]
     SelectedVessel = None
     AllPorts = [||]
+    CurrentRoute = [||]
     PortStatistics = None
     VesselStatistics = None
     SelectedView = FleetMap
