@@ -1,9 +1,9 @@
 version: '3'
 services:
   postgresql:
-    image: "postgres:latest"
+    image: pgrouting/pgrouting:latest
     ports:
-      - "5433:5432" # Maps host port 5433 to container port 5432 (default for Postgres)
+      - "5433:5432"
     environment:
       - POSTGRES_DATABASE=postgres
       - POSTGRES_USER=postgres

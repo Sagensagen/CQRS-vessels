@@ -81,3 +81,5 @@ setup-env.sh
 Client/.build
 /node_modules/
 /CQRS-vessels.sln.DotSettings.user
+Command/coastlines-split-4326.zip
+Command/coastlines-split-4326/*

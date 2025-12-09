@@ -60,6 +60,21 @@ let FleetMap () =
         map.zoom 5
         map.markers [
           yield!
+            ctx.CurrentRoute
+            |> Array.map (fun latLong ->
+              PigeonMaps.marker [
+                marker.anchor (latLong.Latitude, latLong.Longitude)
+                marker.offsetLeft 8
+                marker.offsetTop 8
+                marker.render (fun marker -> [
+                  Fui.icon.circleFilled [
+                    icon.style [style.fontSize 8]
+                    icon.primaryFill Theme.tokens.colorStatusSuccessBackground3
+                  ]
+                ])
+              ]
+            )
+          yield!
             ctx.AllVessels
             |> Array.map (fun vessel ->
               PigeonMaps.marker [
@@ -67,7 +82,7 @@ let FleetMap () =
                 marker.anchor (vessel.Position.Latitude, vessel.Position.Longitude)
                 marker.offsetLeft 25
                 marker.offsetTop 25
-                marker.render (fun marker -> [
+                marker.render (fun _marker -> [
                   Fui.tooltip [
                     tooltip.content vessel.Name
                     tooltip.children [

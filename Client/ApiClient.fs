@@ -16,3 +16,8 @@ let Simulation: Shared.Api.Simulation.ISimulationApi =
   Remoting.createApi ()
   |> Remoting.withBaseUrl "/api"
   |> Remoting.buildProxy<Shared.Api.Simulation.ISimulationApi>
+
+let Route: Shared.Api.Route.IRouteApi =
+  Remoting.createApi ()
+  |> Remoting.withBaseUrl "/api"
+  |> Remoting.buildProxy<Shared.Api.Route.IRouteApi>

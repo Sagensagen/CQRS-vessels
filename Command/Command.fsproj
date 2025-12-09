@@ -22,7 +22,22 @@
     <PackageReference Include="Akka.FSharp" />
     <PackageReference Include="Marten"  />
     <PackageReference Update="FSharp.Core"  />
+    <PackageReference Include="NetTopologySuite" />
+    <PackageReference Include="NetTopologySuite.Features" />
+    <PackageReference Include="NetTopologySuite.IO" />
+    <PackageReference Include="NetTopologySuite.IO.Esri.Shapefile" />
     <PackageReference Include="Serilog"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Route\water-polygons-split-4326\README.txt" />
+    <Content Include="Route\water-polygons-split-4326\water_polygons.cpg" />
+    <Content Include="Route\water-polygons-split-4326\water_polygons.dbf" />
+    <Compile Include="Route\AStar.fs" />
+    <Content Include="Route\water-polygons-split-4326\water_polygons.prj" />
+    <Content Include="Route\water-polygons-split-4326\water_polygons.shp" />
+    <Content Include="Route\water-polygons-split-4326\water_polygons.shx" />
+    <Content Include="Route\25.geojson" />
   </ItemGroup>
 
 </Project>
