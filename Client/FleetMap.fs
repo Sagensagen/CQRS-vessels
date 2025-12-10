@@ -4,6 +4,7 @@ open Client.Context
 open FS.FluentUI
 open Feliz
 open Feliz.PigeonMaps
+open Shared.Api.Vessel
 
 // Shows statistics of all the ports and vessels in the mixer
 [<ReactComponent>]
@@ -40,7 +41,6 @@ let private StatisticsPanel () =
         Fui.text $"Vessels at sea: {vesselStats.AtSea}"
         Fui.text $"Decommissioned vessels: {vesselStats.Decommissioned}"
       | _ -> Fui.spinner []
-
     ]
   ]
 
@@ -78,7 +78,12 @@ let FleetMap () =
             ctx.AllVessels
             |> Array.map (fun vessel ->
               PigeonMaps.marker [
-                marker.onClick (fun _ -> setCtx (UpdateSelectedVessel (Some vessel)))
+                marker.onClick (fun _ ->
+                  match vessel.State with
+                  | InRoute route -> setCtx (UpdateCurrentRoute route.Waypoints)
+                  | _ -> ()
+                  setCtx (UpdateSelectedVessel (Some vessel))
+                )
                 marker.anchor (vessel.Position.Latitude, vessel.Position.Longitude)
                 marker.offsetLeft 25
                 marker.offsetTop 25
@@ -103,6 +108,7 @@ let FleetMap () =
                   ]
                 ])
               ]
+
             )
           yield!
             ctx.AllPorts

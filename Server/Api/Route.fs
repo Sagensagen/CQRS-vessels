@@ -11,10 +11,9 @@ let private routeApi (ctx: HttpContext) : IRouteApi =
     { CalculateRoute =
         fun (startPos: LatLong) (endPos: LatLong) ->
             asyncResult {
-                let! res =
-                    Command.Route.AStar.aStar startPos.Latitude startPos.Longitude endPos.Latitude endPos.Longitude
+                let! res = Command.Route.AStar.aStar startPos endPos
 
-                return res |> Array.map (fun (lat, lon) -> { Latitude = lat; Longitude = lon })
+                return res
             } }
 
 let routeHandler: HttpHandler =

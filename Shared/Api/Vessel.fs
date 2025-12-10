@@ -1,6 +1,7 @@
 module Shared.Api.Vessel
 
 open System
+open Shared.Api.Route
 
 type VesselType =
     | ContainerShip
@@ -15,6 +16,16 @@ type VesselPosition = {
     Timestamp: DateTimeOffset
 }
 
+type RouteInfo = {
+    RouteId: Guid
+    DestinationPortId: Guid
+    DestinationCoordinates: LatLong
+    StartCoordinates: LatLong
+    Waypoints: LatLong array
+    CurrentWaypointIndex: int
+    StartedAt: DateTimeOffset
+}
+
 type VesselActivity =
     | Idle
     | CargoOperation of mode: CargoOperation * cargoId: Guid option
@@ -27,6 +38,7 @@ and CargoOperation =
 
 and OperationalStatus =
     | AtSea
+    | InRoute of routeInfo: RouteInfo
     | Docked of port: Guid
     | Anchored of location: string
     | UnderMaintenance
@@ -82,6 +94,8 @@ type VesselDTO = {
 
 type VesselStatusCommand =
     | Arrive of portId: Guid
+    | StartRoute of RouteInfo
+    | Advance
     | Depart of portId: Guid
     | Anchor of location: string
     | StartMaintenance

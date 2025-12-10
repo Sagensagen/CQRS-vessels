@@ -57,6 +57,15 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         | Domain.VesselErrors.PortNotAvailable -> Shared.Api.Vessel.VesselCommandErrors.PortNotFound
         | Domain.VesselErrors.NoDockingSpace -> Shared.Api.Vessel.VesselCommandErrors.NoDockingAvailableAtPort
         | Domain.VesselErrors.CargoNotFound -> Shared.Api.Vessel.VesselCommandErrors.CargoNotFound
+        | Domain.VesselErrors.NotInRoute ->
+            Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("in route", "not in route")
+        | Domain.VesselErrors.NoMoreWaypoints ->
+            Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("more waypoints", "no more waypoints")
+        | Domain.VesselErrors.NoActiveRoute ->
+            Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("active route", "no active route")
+        | Domain.VesselErrors.RouteCalculationFailed msg ->
+            Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("route calculated", msg)
+        | Domain.VesselErrors.DestinationPortNotFound -> Shared.Api.Vessel.VesselCommandErrors.PortNotFound
         | Domain.VesselErrors.ValidationError msg ->
             Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("valid", msg)
         | Domain.VesselErrors.PersistenceError msg ->
@@ -217,6 +226,21 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             return vesselId
         }
 
+    member this.AdvanceRouteWaypoint
+        (vesselId: Guid, actor: string option)
+        : Async<Result<Guid, Shared.Api.Vessel.VesselCommandErrors>> =
+        asyncResult {
+            let metadata = Domain.EventMetadata.createInitialMetadata actor
+
+            let command =
+                AdvanceRouteWaypoint
+                    { AggregateId = vesselId
+                      Metadata = metadata }
+
+            let! _ = this.SendVesselCommand(vesselId, command)
+            return vesselId
+        }
+
     member _.SendPortCommand
         (portId: Guid, command: PortCommand)
         : Async<Result<int, Shared.Api.Port.PortCommandErrors>> =
@@ -317,6 +341,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             let! _ = this.SendPortCommand(portId, command)
             return portId
         }
+
 
 
     member _.StartDockingSaga

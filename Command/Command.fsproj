@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Route\AStar.fs" />
     <Compile Include="VesselActor.fs" />
     <Compile Include="PortActor.fs" />
     <Compile Include="DockingSaga.fs" />
@@ -33,7 +34,6 @@
     <Content Include="Route\water-polygons-split-4326\README.txt" />
     <Content Include="Route\water-polygons-split-4326\water_polygons.cpg" />
     <Content Include="Route\water-polygons-split-4326\water_polygons.dbf" />
-    <Compile Include="Route\AStar.fs" />
     <Content Include="Route\water-polygons-split-4326\water_polygons.prj" />
     <Content Include="Route\water-polygons-split-4326\water_polygons.shp" />
     <Content Include="Route\water-polygons-split-4326\water_polygons.shx" />

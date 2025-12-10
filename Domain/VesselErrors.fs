@@ -14,3 +14,8 @@ type VesselError =
     | CargoNotFound
     | ValidationError of message: string
     | PersistenceError of message: string
+    | NoActiveRoute
+    | NotInRoute
+    | NoMoreWaypoints
+    | RouteCalculationFailed of message: string
+    | DestinationPortNotFound

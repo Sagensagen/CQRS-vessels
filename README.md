@@ -67,3 +67,9 @@ FROM water;
 For plotting route: latLong [] https://tbensky.github.io/Maps/points.html
 Fast link for Google maps https://www.google.com/maps
 
+## Domain rules
+1. Vessels can not dock in a port if they are not already docked. This should be a handshake/transaction through a saga in order for the dock to be reserved correctly.
+2. Vessels can move positions freely, but in order to dock a vessel has to get a route to a port, and can only dock when they have arrived(no more steps to advance in the route)
+3. Vessels can only undock when they are docked in a port duh
+4. Some cargo stuff later
+5.

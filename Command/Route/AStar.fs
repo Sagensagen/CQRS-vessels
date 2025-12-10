@@ -3,6 +3,7 @@ module Command.Route.AStar
 open FsToolkit.ErrorHandling
 open Npgsql
 open Serilog
+open Shared.Api.Route
 
 let private srid = 4326
 let connectionString =
@@ -14,13 +15,10 @@ let private dataSource =
     builder.UseNetTopologySuite() |> ignore
     builder.Build()
 
-let aStar
-    (startLatitude: float)
-    (startLongitude: float)
-    (endLatitude: float)
-    (endLongitude: float)
-    =
+let aStar (startLatLon: LatLong) (endLatLon: LatLong) =
     asyncResult {
+        printfn $"{startLatLon}"
+        printfn $"{endLatLon}"
         let sqlCommand =
             $"""
             WITH nodes AS (
@@ -77,10 +75,10 @@ let aStar
         use conn = dataSource.OpenConnection()
         use cmd = new NpgsqlCommand(sqlCommand, conn)
 
-        cmd.Parameters.AddWithValue("@startLat", startLatitude) |> ignore
-        cmd.Parameters.AddWithValue("@startLon", startLongitude) |> ignore
-        cmd.Parameters.AddWithValue("@endLat", endLatitude) |> ignore
-        cmd.Parameters.AddWithValue("@endLon", endLongitude) |> ignore
+        cmd.Parameters.AddWithValue("@startLat", startLatLon.Latitude) |> ignore
+        cmd.Parameters.AddWithValue("@startLon", startLatLon.Longitude) |> ignore
+        cmd.Parameters.AddWithValue("@endLat", endLatLon.Latitude) |> ignore
+        cmd.Parameters.AddWithValue("@endLon", endLatLon.Longitude) |> ignore
 
         use reader = cmd.ExecuteReader()
 
@@ -88,7 +86,7 @@ let aStar
             while reader.Read() do
                 let lat = reader.GetDouble(0)
                 let lon = reader.GetDouble(1)
-                yield (lat, lon)
+                yield { Latitude = lat; Longitude = lon }
         |]
-        return results
+        return results |> Array.distinct
     }
