@@ -72,9 +72,9 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
             }
 
       UpdateOperationalStatus =
-        fun vesselId status ->
+        fun vesselId cmd ->
             asyncResult {
-                match status with
+                match cmd with
                 | Arrive portId -> return! commandGateway.StartDockingSaga(vesselId, portId, Some "API.Arrive")
 
                 | Depart portId ->
@@ -98,6 +98,20 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
                             Some "API.StartMaintenance"
                         )
                 | Decommission -> return! commandGateway.DecommissionVessel(vesselId, Some "API.Decommission")
+
+                | StartRoute route ->
+                    // Try calculate shortest path
+                    let! waypoints = Command.Route.AStar.aStar route.StartCoordinates route.DestinationCoordinates
+
+                    return!
+                        commandGateway.UpdateOperationalStatus(
+                            vesselId,
+                            OperationalStatus.InRoute { route with Waypoints = waypoints },
+                            VesselActivity.Idle,
+                            Some "API.Anchor"
+                        )
+
+                | Advance -> return! commandGateway.AdvanceRouteWaypoint(vesselId, Some "API.MoveSingleWaypoint")
             }
 
       UpdatePosition =

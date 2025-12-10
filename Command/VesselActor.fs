@@ -8,6 +8,8 @@ open Domain.EventMetadata
 open Domain.VesselAggregate
 open Domain.VesselErrors
 open Serilog
+open Shared.Api.Vessel
+open Shared.Api.Route
 
 type VesselCommandResponse =
     | VesselCommandSuccess of eventCount: int

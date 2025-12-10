@@ -3,6 +3,7 @@ module Query.ReadModels
 open System
 open Shared.Api.Vessel
 open Shared.Api.Port
+open Shared.Api.Route
 
 [<CLIMutable>]
 type VesselReadModel =

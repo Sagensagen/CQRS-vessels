@@ -234,7 +234,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         | Decommissioned -> Fui.text "Decomissioned"
                         | Docked port -> Fui.text $"Docket at {port}"
                         | UnderMaintenance -> Fui.text "Under maintenance"
-
+                        | InRoute _route -> Fui.text "In route"
                       ]
                     ]
                   ]
@@ -249,7 +249,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                     Fui.card [
                       let isSelected =
                         (match status with
-                         | (Some (Depart _)) -> true
+                         | Some (Depart _) -> true
                          | _ -> false)
                       card.orientation.horizontal
                       card.style [
@@ -299,6 +299,70 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         Fui.icon.locationArrowLeftRegular [icon.size.``24``]
                       ]
                       card.onClick (fun _ -> setStatus (Some (Arrive (Guid.Empty))))
+                    ]
+                    Fui.card [
+                      let isSelected =
+                        (match status with
+                         | Some (StartRoute _) -> true
+                         | _ -> false)
+                      card.orientation.horizontal
+                      card.disabled (
+                        match vessel.State with
+                        | InRoute _ -> true
+                        | _ -> false
+                      )
+                      card.style [
+                        if isSelected then
+                          style.backgroundColor Theme.tokens.colorBrandBackgroundInvertedSelected
+                        style.minWidth 250
+                        style.maxWidth (length.perc 100)
+                        style.display.flex
+                      ]
+                      card.selected isSelected
+                      card.children [
+                        Fui.text "Start route to port"
+                        Fui.icon.locationArrowLeftRegular [icon.size.``24``]
+                      ]
+                      card.onClick (fun _ ->
+                        let inRoute = {
+                          RouteId = Guid.NewGuid ()
+                          DestinationPortId = Guid.Empty
+                          DestinationCoordinates = {Latitude = 0.; Longitude = 0.}
+                          StartCoordinates = {
+                            Latitude = vessel.Position.Latitude
+                            Longitude = vessel.Position.Longitude
+                          }
+                          Waypoints = [||]
+                          CurrentWaypointIndex = 0
+                          StartedAt = DateTimeOffset.UtcNow
+                        }
+                        setStatus (Some (StartRoute inRoute))
+                      )
+                    ]
+                    Fui.card [
+                      let isSelected =
+                        (match status with
+                         | Some Advance -> true
+                         | _ -> false)
+                      card.orientation.horizontal
+                      card.disabled (
+                        match vessel.State with
+                        | InRoute _ -> false // Only allow advancing when InRoute
+                        | _ -> true
+                      )
+                      card.style [
+                        if isSelected then
+                          style.backgroundColor Theme.tokens.colorBrandBackgroundInvertedSelected
+                        style.minWidth 250
+                        style.maxWidth (length.perc 100)
+                        style.display.flex
+                      ]
+                      card.selected isSelected
+                      card.children [
+                        Fui.text "Advance to next waypoint"
+                        Fui.icon.arrowMoveRegular [icon.size.``24``]
+                      ]
+                      card.onClick (fun _ -> setStatus (Some Advance))
                     ]
                     Fui.card [
                       let isSelected =
@@ -403,6 +467,41 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         input.value port
                         input.placeholder "What port are you docking at?"
                         input.onChange (fun (v: string) -> setStatus (Some (Arrive (Guid.NewGuid ()))))
+                      ]
+                    ]
+                  ]
+                | Some (StartRoute route) ->
+                  Fui.field [
+                    field.label "Port"
+                    field.children [
+                      Fui.dropdown [
+                        dropdown.onOptionSelect (fun vv ->
+                          vv.optionValue
+                          |> Option.iter (fun v ->
+                            let parsed = Guid.Parse v
+                            let port = _ctx.AllPorts |> Array.find (fun s -> s.Id = parsed)
+                            setStatus (
+                              Some (
+                                StartRoute {
+                                  route with
+                                      DestinationPortId = port.Id
+                                      DestinationCoordinates = {Latitude = port.Latitude; Longitude = port.Longitude}
+                                }
+                              )
+                            )
+                          )
+                        )
+                        dropdown.children [
+                          yield!
+                            _ctx.AllPorts
+                            |> Array.map (fun port ->
+                              Fui.option [
+                                option.text port.Name
+                                option.value (port.Id.ToString ())
+                                option.children [Fui.text port.Name]
+                              ]
+                            )
+                        ]
                       ]
                     ]
                   ]
@@ -540,6 +639,7 @@ let VesselStatus () =
                       | Anchored pos -> $"Anchored at {pos}"
                       | UnderMaintenance -> "UnderMaintenance"
                       | Decommissioned -> "Decommissioned"
+                      | InRoute route -> "In route"
                     )
                   ]
                 ]

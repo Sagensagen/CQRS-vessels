@@ -85,7 +85,13 @@ type ContextMsg =
 
 let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   match msg with
-  | UpdateAllVessels vessels -> {model with AllVessels = vessels}
+  | UpdateAllVessels vessels ->
+    let selected =
+      match model.SelectedVessel with
+      | Some vessel -> vessels |> Array.tryFind (fun v -> v.Id = vessel.Id)
+      | None -> None
+
+    {model with AllVessels = vessels; SelectedVessel = selected}
   | UpdateSelectedVessel vessel -> {model with SelectedVessel = vessel}
   | UpdateAllPorts ports -> {model with AllPorts = ports}
   | UpdateCurrentRoute r -> {model with CurrentRoute = r}

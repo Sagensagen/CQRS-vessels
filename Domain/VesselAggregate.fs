@@ -32,6 +32,7 @@ type VesselCommand =
     | DepartFromPort of DepartFromPortCmd
     | UpdateOperationalStatus of UpdateOperationalStatusCmd
     | DecommissionVessel of DecommissionVesselCmd
+    | AdvanceRouteWaypoint of AdvanceRouteWaypointCmd
 
 and RegisterVesselCmd = {
     Id: Guid
@@ -71,6 +72,8 @@ and UpdateOperationalStatusCmd = {
 }
 
 and DecommissionVesselCmd = { AggregateId: Guid; Metadata: EventMetadata }
+
+and AdvanceRouteWaypointCmd = { AggregateId: Guid; Metadata: EventMetadata }
 
 type VesselEvent =
     | VesselRegistered of VesselRegisteredEvt
@@ -150,7 +153,8 @@ module private Validation =
     let canArriveAtPort (state: VesselState) : Result<unit, VesselError> =
         match state.State with
         | OperationalStatus.AtSea -> Ok()
-        | _ -> Error(InvalidStateTransition("at sea", string state.State))
+        | OperationalStatus.InRoute _ -> Ok()
+        | _ -> Error(InvalidStateTransition("at sea or in route", string state.State))
 
 let decide
     (state: VesselState option)
@@ -194,7 +198,7 @@ let decide
     | UpdatePosition _, None -> Error VesselNotFound
 
     | ArriveAtPort cmd, Some vessel ->
-        match Validation.canArriveAtPort vessel with
+        match Validation.canArriveAtPort vessel with // TODO check if in route and is at last route idx and the port is correct. Maybe just drop the portId in the command and rely on the routeInfo??
         | Ok() ->
             Ok [
                 VesselArrived {
@@ -250,6 +254,36 @@ let decide
         ]
 
     | DecommissionVessel _, None -> Error VesselNotFound
+
+    | AdvanceRouteWaypoint cmd, Some vessel ->
+        match vessel.State with
+        | OperationalStatus.InRoute route ->
+            let nextIndex = route.CurrentWaypointIndex + 1
+
+            if nextIndex >= route.Waypoints.Length then
+                Error NoMoreWaypoints
+            else
+                let updatedRoute = { route with CurrentWaypointIndex = nextIndex }
+                let nextWaypoint = route.Waypoints.[nextIndex]
+
+                Ok [
+                    VesselPositionUpdated {
+                        Position = {
+                            Latitude = nextWaypoint.Latitude
+                            Longitude = nextWaypoint.Longitude
+                            Timestamp = cmd.Metadata.Timestamp
+                        }
+                        UpdatedAt = cmd.Metadata.Timestamp
+                    }
+                    VesselOperationalStatusUpdated {
+                        Status = OperationalStatus.InRoute updatedRoute
+                        Activity = VesselActivity.Idle
+                        UpdatedAt = cmd.Metadata.Timestamp
+                    }
+                ]
+        | _ -> Error NotInRoute
+
+    | AdvanceRouteWaypoint _, None -> Error VesselNotFound
 
 let evolve (state: VesselState option) (event: VesselEvent) : VesselState option =
     match event, state with

@@ -60,6 +60,13 @@ let private Application () =
 
   // Fetch all ports and vessels every 5s
   // Add WS?
+  React.useEffectOnce (fun _ ->
+    getVessels (UpdateAllVessels >> setCtx) setCtx
+    getPorts (UpdateAllPorts >> setCtx) setCtx
+    getPortStatistics (fun stats -> UpdatePortStatistics (Some stats) |> setCtx) setCtx
+    getVesselStatistics (fun stats -> UpdateVesselStatistics (Some stats) |> setCtx) setCtx
+
+  )
   React.useEffect (
     (fun _ ->
       let pollTimer =
@@ -70,7 +77,7 @@ let private Application () =
             getPortStatistics (fun stats -> UpdatePortStatistics (Some stats) |> setCtx) setCtx
             getVesselStatistics (fun stats -> UpdateVesselStatistics (Some stats) |> setCtx) setCtx
           ),
-          5000,
+          2000,
           []
         )
 
