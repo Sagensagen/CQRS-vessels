@@ -18,7 +18,6 @@ type VesselState = {
     Beam: float option
     Draught: float option
     State: OperationalStatus
-    Activity: VesselActivity
     VesselType: VesselType
     CrewSize: int
     CurrentPortId: Guid option
@@ -67,7 +66,6 @@ and DepartFromPortCmd = { AggregateId: Guid; Metadata: EventMetadata }
 and UpdateOperationalStatusCmd = {
     AggregateId: Guid
     Status: OperationalStatus
-    Activity: VesselActivity
     Metadata: EventMetadata
 }
 
@@ -108,11 +106,7 @@ and VesselArrivedEvt = {
 
 and VesselDepartedEvt = { FromPortId: Guid; DepartedAt: DateTimeOffset }
 
-and VesselOperationalStatusUpdatedEvt = {
-    Status: OperationalStatus
-    Activity: VesselActivity
-    UpdatedAt: DateTimeOffset
-}
+and VesselOperationalStatusUpdatedEvt = { Status: OperationalStatus; UpdatedAt: DateTimeOffset }
 
 and VesselDecommissionedEvt = { DecommissionedAt: DateTimeOffset }
 
@@ -153,7 +147,16 @@ module private Validation =
     let canArriveAtPort (state: VesselState) : Result<unit, VesselError> =
         match state.State with
         | OperationalStatus.AtSea -> Ok()
-        | OperationalStatus.InRoute _ -> Ok()
+        | OperationalStatus.InRoute route ->
+            if route.CurrentWaypointIndex = route.Waypoints.Length then
+                Ok()
+            else
+                Error(
+                    InvalidStateTransition(
+                        "Not there yet, keep advancing on route",
+                        string state.State
+                    )
+                )
         | _ -> Error(InvalidStateTransition("at sea or in route", string state.State))
 
 let decide
@@ -208,7 +211,6 @@ let decide
                 }
                 VesselOperationalStatusUpdated {
                     Status = OperationalStatus.Docked cmd.PortId
-                    Activity = VesselActivity.Idle
                     UpdatedAt = cmd.Metadata.Timestamp
                 }
             ]
@@ -224,7 +226,6 @@ let decide
                 VesselDeparted { FromPortId = portId; DepartedAt = cmd.Metadata.Timestamp }
                 VesselOperationalStatusUpdated {
                     Status = OperationalStatus.AtSea
-                    Activity = VesselActivity.Idle
                     UpdatedAt = cmd.Metadata.Timestamp
                 }
             ]
@@ -236,7 +237,6 @@ let decide
         Ok [
             VesselOperationalStatusUpdated {
                 Status = cmd.Status
-                Activity = cmd.Activity
                 UpdatedAt = cmd.Metadata.Timestamp
             }
         ]
@@ -248,7 +248,6 @@ let decide
             VesselDecommissioned { DecommissionedAt = cmd.Metadata.Timestamp }
             VesselOperationalStatusUpdated {
                 Status = OperationalStatus.Decommissioned
-                Activity = VesselActivity.Idle
                 UpdatedAt = cmd.Metadata.Timestamp
             }
         ]
@@ -277,7 +276,6 @@ let decide
                     }
                     VesselOperationalStatusUpdated {
                         Status = OperationalStatus.InRoute updatedRoute
-                        Activity = VesselActivity.Idle
                         UpdatedAt = cmd.Metadata.Timestamp
                     }
                 ]
@@ -300,7 +298,6 @@ let evolve (state: VesselState option) (event: VesselEvent) : VesselState option
             Beam = evt.Beam
             Draught = evt.Draught
             State = OperationalStatus.AtSea
-            Activity = VesselActivity.Idle
             VesselType = evt.VesselType
             CrewSize = evt.CrewSize
             CurrentPortId = None
@@ -313,8 +310,7 @@ let evolve (state: VesselState option) (event: VesselEvent) : VesselState option
 
     | VesselDeparted _, Some vessel -> Some { vessel with CurrentPortId = None }
 
-    | VesselOperationalStatusUpdated evt, Some vessel ->
-        Some { vessel with State = evt.Status; Activity = evt.Activity }
+    | VesselOperationalStatusUpdated evt, Some vessel -> Some { vessel with State = evt.Status }
 
     | VesselDecommissioned _, Some vessel -> Some vessel
 

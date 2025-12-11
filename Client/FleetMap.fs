@@ -60,30 +60,31 @@ let FleetMap () =
         map.zoom 5
         map.markers [
           yield!
-            ctx.CurrentRoute
-            |> Array.map (fun latLong ->
-              PigeonMaps.marker [
-                marker.anchor (latLong.Latitude, latLong.Longitude)
-                marker.offsetLeft 8
-                marker.offsetTop 8
-                marker.render (fun marker -> [
-                  Fui.icon.circleFilled [
-                    icon.style [style.fontSize 8]
-                    icon.primaryFill Theme.tokens.colorStatusSuccessBackground3
+            match ctx.SelectedVessel with
+            | None -> [||]
+            | Some vessel ->
+              match vessel.State with
+              | InRoute route ->
+                route.Waypoints
+                |> Array.map (fun latLong ->
+                  PigeonMaps.marker [
+                    marker.anchor (latLong.Latitude, latLong.Longitude)
+                    marker.offsetLeft 8
+                    marker.offsetTop 8
+                    marker.render (fun marker -> [
+                      Fui.icon.circleFilled [
+                        icon.style [style.fontSize 8]
+                        icon.primaryFill Theme.tokens.colorStatusSuccessBackground3
+                      ]
+                    ])
                   ]
-                ])
-              ]
-            )
+                )
+              | _ -> [||]
           yield!
             ctx.AllVessels
             |> Array.map (fun vessel ->
               PigeonMaps.marker [
-                marker.onClick (fun _ ->
-                  match vessel.State with
-                  | InRoute route -> setCtx (UpdateCurrentRoute route.Waypoints)
-                  | _ -> ()
-                  setCtx (UpdateSelectedVessel (Some vessel))
-                )
+                marker.onClick (fun _ -> setCtx (UpdateSelectedVessel (Some vessel)))
                 marker.anchor (vessel.Position.Latitude, vessel.Position.Longitude)
                 marker.offsetLeft 25
                 marker.offsetTop 25
@@ -108,7 +109,6 @@ let FleetMap () =
                   ]
                 ])
               ]
-
             )
           yield!
             ctx.AllPorts

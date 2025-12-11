@@ -41,28 +41,36 @@ bun fable
 ```bash
 dotnet run --project Server
 ```
-#### Populate ocean shapefiles into postgis
-Download shapeFile gemoetries https://osmdata.openstreetmap.de/data/water-polygons.html
+#### Populate ocean GeoJSON into postgis
+Download GeoJSON gemoetries http://geocommons.com/datasets?id=25
 
-```bash
-shp2pgsql -I -D -s 4326 water_polygons.shp water | psql -h localhost -U postgres -p 5433 -d postgres
-```
 
 ### Getting started with PostGIS
 Install the postgis/enable it at least
 ```sql
 CREATE EXTENSION postgis;
+CREATE EXTENSION pgrouting;
 ```
-Populate the polygon dataset of global waters
+
+
+Populate the dataset. Need Gdal for this
 ```bash
-shp2pgsql -I -D -s 4326 water_polygons.shp water | psql -h localhost -U postgres -p 5433 -d postgres
+ogr2ogr -f "PostgreSQL" \                                                           on 
+        PG:"host=localhost user=postgres dbname=postgres password=postgres port=5433" \
+        ./25.geojson \
+        -nln ship_routes \
+        -nlt LINESTRING \
+        -lco GEOMETRY_NAME=geom \
+        -lco FID=gid
+
 ```
-Create a grid from the polygons. Shortes paths need a grid network of edges, and polygons does not really make sense. Create single points from these
+Alter the columns for readability / QX(query experience)
 ```sql
-CREATE TABLE grid AS
-SELECT (ST_HexagonGrid(0.1, ST_Extent(geom))).*
-FROM water;
+ALTER TABLE ship_routes RENAME COLUMN "length0" TO "cost";
+ALTER TABLE ship_routes RENAME COLUMN "from node0" TO source;
+ALTER TABLE ship_routes RENAME COLUMN "to node0" TO target;
 ```
+
 #### Other
 For plotting route: latLong [] https://tbensky.github.io/Maps/points.html
 Fast link for Google maps https://www.google.com/maps

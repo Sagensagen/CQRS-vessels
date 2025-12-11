@@ -267,7 +267,6 @@ let rec private simulateVessel
                         gateway.UpdateOperationalStatus(
                             vessel.VesselId,
                             (OperationalStatus.InRoute routeInfo),
-                            VesselActivity.Idle,
                             Some "Simulation"
                         )
 
@@ -314,13 +313,11 @@ let rec private simulateVessel
                         // Check if we've reached the end of the route
                         if err.ToString().Contains("no more waypoints") then
                             Log.Information(
-                                "{VesselName} reached end of route, attempting to dock at port {PortId}",
-                                vessel.Name,
-                                destinationPortId
+                                "{VesselName} reached end of route, attempting to dock at destination port",
+                                vessel.Name
                             )
 
-                            let! dockResult =
-                                gateway.StartDockingSaga(vessel.VesselId, destinationPortId, Some "Simulation")
+                            let! dockResult = gateway.StartDockingSaga(vessel.VesselId, Some "Simulation")
 
                             match dockResult with
                             | Ok sagaId ->
@@ -399,7 +396,7 @@ let private runSimulation (gateway: CommandGateway.CommandGateway) (vesselCount:
                     let portTasks =
                         ports
                         |> List.sortBy (fun _ -> rnd.Next())
-                        |> List.take 5
+                        |> List.take 8
                         |> List.map (fun p ->
                             task {
                                 let portId = Guid.NewGuid()

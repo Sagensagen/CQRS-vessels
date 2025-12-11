@@ -75,7 +75,16 @@ let getVesselEvents (vesselId: Guid) (session: IQuerySession) =
 
                 | :? VesselOperationalStatusUpdatedEvt as ev ->
                     { Title = "Status updated"
-                      Description = $"{ev.Status} - {ev.Activity}"
+                      Description =
+                        match ev.Status with
+                        | AtSea -> $"{ev.Status}"
+                        | InRoute route ->
+                            $"InRoute: towards port {route.DestinationPortId}, {route.CurrentWaypointIndex}/{route.Waypoints.Length} steps"
+                        | Docked port -> $"{ev.Status}"
+                        | Anchored pos -> $"{ev.Status}"
+                        | UnderMaintenance -> $"{ev.Status}"
+                        | Decommissioned -> $"{ev.Status}"
+
                       EventType = EventWrapperType.Info
                       Inserted = event.Timestamp }
 
