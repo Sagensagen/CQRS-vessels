@@ -114,7 +114,7 @@ let FleetMap () =
             ctx.AllPorts
             |> Array.map (fun port ->
               PigeonMaps.marker [
-                marker.anchor (port.Latitude, port.Longitude)
+                marker.anchor (port.Position.Latitude, port.Position.Longitude)
                 marker.offsetLeft 102
                 marker.offsetTop 35
                 marker.render (fun marker -> [

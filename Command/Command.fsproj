@@ -30,14 +30,4 @@
     <PackageReference Include="Serilog"  />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Route\water-polygons-split-4326\README.txt" />
-    <Content Include="Route\water-polygons-split-4326\water_polygons.cpg" />
-    <Content Include="Route\water-polygons-split-4326\water_polygons.dbf" />
-    <Content Include="Route\water-polygons-split-4326\water_polygons.prj" />
-    <Content Include="Route\water-polygons-split-4326\water_polygons.shp" />
-    <Content Include="Route\water-polygons-split-4326\water_polygons.shx" />
-    <Content Include="Route\25.geojson" />
-  </ItemGroup>
-
 </Project>

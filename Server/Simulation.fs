@@ -7,169 +7,146 @@ open FsToolkit.ErrorHandling
 open Marten
 open Microsoft.AspNetCore.Http
 open Serilog
-open Shared.Api.Route
 open Shared.Api.Vessel
+open Shared.Api.Shared
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Giraffe
 open Shared.Api.Simulation
 
-type private Port =
-    { Name: string
-      Latitude: float
-      Longitude: float }
+type private Port = { Name: string; Position: LatLong }
 
 let private ports: Port list =
     [ { Name = "Port of Shanghai, China"
-        Latitude = 31.22
-        Longitude = 121.48 }
+        Position = { Latitude = 31.22; Longitude = 121.48 } }
       { Name = "Yangshan Port, China"
-        Latitude = 30.6294
-        Longitude = 122.0577 }
+        Position =
+          { Latitude = 30.6294
+            Longitude = 122.0577 } }
       { Name = "Port of Singapore, Singapore"
-        Latitude = 1.264
-        Longitude = 103.820 }
+        Position =
+          { Latitude = 1.264
+            Longitude = 103.820 } }
       { Name = "Port of Hong Kong, Hong Kong"
-        Latitude = 22.317
-        Longitude = 114.170 }
+        Position =
+          { Latitude = 22.317
+            Longitude = 114.170 } }
       { Name = "Port of Busan, South Korea"
-        Latitude = 35.10
-        Longitude = 129.04 }
+        Position = { Latitude = 35.10; Longitude = 129.04 } }
       { Name = "Port of Yokohama, Japan"
-        Latitude = 35.27
-        Longitude = 139.38 }
+        Position = { Latitude = 35.27; Longitude = 139.38 } }
       { Name = "Port of Los Angeles, USA"
-        Latitude = 33.7428
-        Longitude = -118.2614 }
+        Position =
+          { Latitude = 33.7428
+            Longitude = -118.2614 } }
       { Name = "Port of Long Beach, USA"
-        Latitude = 33.75
-        Longitude = -118.20 }
+        Position =
+          { Latitude = 33.75
+            Longitude = -118.20 } }
       { Name = "Port of Rotterdam, Netherlands"
-        Latitude = 51.95
-        Longitude = 4.14 }
+        Position = { Latitude = 51.95; Longitude = 4.14 } }
       { Name = "Port of Antwerp-Bruges, Belgium"
-        Latitude = 51.22
-        Longitude = 4.40 }
+        Position = { Latitude = 51.22; Longitude = 4.40 } }
       { Name = "Port of Barcelona, Spain"
-        Latitude = 41.346176
-        Longitude = 2.168365 }
+        Position =
+          { Latitude = 41.346176
+            Longitude = 2.168365 } }
       { Name = "Port of Gothenburg, Sweden"
-        Latitude = 57.7
-        Longitude = 11.9 }
+        Position = { Latitude = 57.7; Longitude = 11.9 } }
       { Name = "Port of Jebel Ali (Dubai), UAE"
-        Latitude = 25.0033
-        Longitude = 55.0521 }
+        Position =
+          { Latitude = 25.0033
+            Longitude = 55.0521 } }
       { Name = "Port of Djibouti, Djibouti"
-        Latitude = 11.59
-        Longitude = 43.15 }
+        Position = { Latitude = 11.59; Longitude = 43.15 } }
       { Name = "Port of Callao, Peru"
-        Latitude = -12.05
-        Longitude = -77.15 }
+        Position =
+          { Latitude = -12.05
+            Longitude = -77.15 } }
       { Name = "Port of Tianjin, China"
-        Latitude = 39.0
-        Longitude = 117.7 }
+        Position = { Latitude = 39.0; Longitude = 117.7 } }
       { Name = "Port of Shenzhen, China"
-        Latitude = 22.5
-        Longitude = 114.0 }
+        Position = { Latitude = 22.5; Longitude = 114.0 } }
       { Name = "Port of Qingdao, China"
-        Latitude = 36.07
-        Longitude = 120.38 }
+        Position = { Latitude = 36.07; Longitude = 120.38 } }
       { Name = "Port of Guangzhou, China"
-        Latitude = 23.10
-        Longitude = 113.25 }
+        Position = { Latitude = 23.10; Longitude = 113.25 } }
       { Name = "Port of Durban, South Africa"
-        Latitude = -29.88
-        Longitude = 31.02 }
+        Position = { Latitude = -29.88; Longitude = 31.02 } }
       { Name = "Port of Santos, Brazil"
-        Latitude = -23.96
-        Longitude = -46.33 }
+        Position =
+          { Latitude = -23.96
+            Longitude = -46.33 } }
       { Name = "Port of Buenos Aires, Argentina"
-        Latitude = -34.6
-        Longitude = -58.4 }
+        Position = { Latitude = -34.6; Longitude = -58.4 } }
       { Name = "Port of Valparaiso, Chile"
-        Latitude = -33.05
-        Longitude = -71.63 }
+        Position =
+          { Latitude = -33.05
+            Longitude = -71.63 } }
       { Name = "Port of Vancouver, Canada"
-        Latitude = 49.3
-        Longitude = -123.1 }
+        Position = { Latitude = 49.3; Longitude = -123.1 } }
       { Name = "Port of Seattle, USA"
-        Latitude = 47.6
-        Longitude = -122.33 }
+        Position = { Latitude = 47.6; Longitude = -122.33 } }
       { Name = "Port of Hamburg, Germany"
-        Latitude = 53.55
-        Longitude = 9.99 }
+        Position = { Latitude = 53.55; Longitude = 9.99 } }
       { Name = "Port of Marseille, France"
-        Latitude = 43.3
-        Longitude = 5.37 }
+        Position = { Latitude = 43.3; Longitude = 5.37 } }
       { Name = "Port of Piraeus, Greece"
-        Latitude = 37.94
-        Longitude = 23.64 }
+        Position = { Latitude = 37.94; Longitude = 23.64 } }
       { Name = "Port of Alexandria, Egypt"
-        Latitude = 31.2
-        Longitude = 29.9 }
+        Position = { Latitude = 31.2; Longitude = 29.9 } }
       { Name = "Port of Mombasa, Kenya"
-        Latitude = -4.05
-        Longitude = 39.66 }
+        Position = { Latitude = -4.05; Longitude = 39.66 } }
       { Name = "Port of Lagos (Apapa), Nigeria"
-        Latitude = 6.45
-        Longitude = 3.40 }
+        Position = { Latitude = 6.45; Longitude = 3.40 } }
       { Name = "Port of Colombo, Sri Lanka"
-        Latitude = 6.93
-        Longitude = 79.85 }
+        Position = { Latitude = 6.93; Longitude = 79.85 } }
       { Name = "Port of Karachi, Pakistan"
-        Latitude = 24.835596
-        Longitude = 66.981445 }
+        Position =
+          { Latitude = 24.835596
+            Longitude = 66.981445 } }
       { Name = "Port of Mumbai (Nhava Sheva), India"
-        Latitude = 18.94
-        Longitude = 72.83 }
+        Position = { Latitude = 18.94; Longitude = 72.83 } }
       { Name = "Port of Ho Chi Minh City, Vietnam"
-        Latitude = 10.82
-        Longitude = 106.63 }
+        Position = { Latitude = 10.82; Longitude = 106.63 } }
       { Name = "Port of Jakarta (Tanjung Priok), Indonesia"
-        Latitude = -6.12
-        Longitude = 106.85 }
+        Position = { Latitude = -6.12; Longitude = 106.85 } }
       { Name = "Port of Manila, Philippines"
-        Latitude = 14.58
-        Longitude = 120.97 }
+        Position = { Latitude = 14.58; Longitude = 120.97 } }
       { Name = "Port of Sydney, Australia"
-        Latitude = -33.86
-        Longitude = 151.20 }
+        Position =
+          { Latitude = -33.86
+            Longitude = 151.20 } }
       { Name = "Port of Melbourne, Australia"
-        Latitude = -37.82
-        Longitude = 144.96 }
+        Position =
+          { Latitude = -37.82
+            Longitude = 144.96 } }
       { Name = "Port of Genoa, Italy"
-        Latitude = 44.40
-        Longitude = 8.93 }
+        Position = { Latitude = 44.40; Longitude = 8.93 } }
       { Name = "Port of Trieste, Italy"
-        Latitude = 45.65
-        Longitude = 13.76 }
+        Position = { Latitude = 45.65; Longitude = 13.76 } }
       { Name = "Port of Istanbul, Turkey"
-        Latitude = 41.0
-        Longitude = 28.97 }
+        Position = { Latitude = 41.0; Longitude = 28.97 } }
       { Name = "Port of Haifa, Israel"
-        Latitude = 32.82
-        Longitude = 34.99 }
+        Position = { Latitude = 32.82; Longitude = 34.99 } }
       { Name = "Port of Beirut, Lebanon"
-        Latitude = 33.90
-        Longitude = 35.52 }
+        Position = { Latitude = 33.90; Longitude = 35.52 } }
       { Name = "Port of Montreal, Canada"
-        Latitude = 45.50
-        Longitude = -73.55 }
+        Position = { Latitude = 45.50; Longitude = -73.55 } }
       { Name = "Port of New York/New Jersey, USA"
-        Latitude = 40.67
-        Longitude = -74.04 }
+        Position = { Latitude = 40.67; Longitude = -74.04 } }
       { Name = "Port of Savannah, USA"
-        Latitude = 32.08
-        Longitude = -81.10 }
+        Position = { Latitude = 32.08; Longitude = -81.10 } }
       { Name = "Port of Houston, USA"
-        Latitude = 29.73
-        Longitude = -95.27 }
+        Position = { Latitude = 29.73; Longitude = -95.27 } }
       { Name = "Port of Auckland, New Zealand"
-        Latitude = -36.84
-        Longitude = 174.76 }
+        Position =
+          { Latitude = -36.84
+            Longitude = 174.76 } }
       { Name = "Port of Wellington, New Zealand"
-        Latitude = -41.29
-        Longitude = 174.78 } ]
+        Position =
+          { Latitude = -41.29
+            Longitude = 174.78 } } ]
 
 type VesselState =
     | AtSea
@@ -181,7 +158,7 @@ type SimulatedVessel =
     { VesselId: Guid
       Name: string
       State: VesselState
-      CurrentPosition: VesselPosition }
+      CurrentPosition: LatLong }
 
 let private random = Random()
 
@@ -189,23 +166,15 @@ let private randomName prefix = $"{prefix}-{(random.Next(1000, 9999))}"
 
 let private randomPosition () =
     { Latitude = (random.NextDouble() * 180.0) - 90.0
-      Longitude = (random.NextDouble() * 360.0) - 180.0
-      Timestamp = DateTimeOffset.UtcNow }
+      Longitude = (random.NextDouble() * 360.0) - 180.0 }
 
 let private randomVesselType () =
     let types = [| ContainerShip; BulkCarrier; Passenger; Fishing |]
     types.[random.Next(types.Length)]
 
-
-
 /// <summary>
 /// Recursive simulation of a single vessels events. A new event is triggered when the first one in finished
 /// </summary>
-/// <param name="vessel"></param>
-/// <param name="ports"></param>
-/// <param name="gateway"></param>
-/// <param name="vesselCount"></param>
-/// <param name="cts"></param>
 let rec private simulateVessel
     (vessel: SimulatedVessel)
     (portMap: (Guid * Port) array)
@@ -221,8 +190,7 @@ let rec private simulateVessel
             else
                 match vessel.State with
                 | AtSea ->
-                    // At sea: create a route to a random port
-                    let (destinationPortId, destinationPortData) = portMap.[random.Next(portMap.Length)]
+                    let destinationPortId, destinationPortData = portMap.[random.Next(portMap.Length)]
 
                     Log.Information(
                         "{VesselName} creating route from ({StartLat}, {StartLon}) to port {PortName} ({PortId})",
@@ -233,16 +201,8 @@ let rec private simulateVessel
                         destinationPortId
                     )
 
-                    let startCoordinate: LatLong =
-                        { Latitude = vessel.CurrentPosition.Latitude
-                          Longitude = vessel.CurrentPosition.Longitude }
-
-                    let endCoordinate: LatLong =
-                        { Latitude = destinationPortData.Latitude
-                          Longitude = destinationPortData.Longitude }
-
                     let! waypoints =
-                        (Command.Route.AStar.aStar startCoordinate endCoordinate)
+                        (Command.Route.AStar.aStar vessel.CurrentPosition destinationPortData.Position)
                         |> AsyncResult.defaultWith (fun _ ->
 
                             Log.Error "FAILED TO GET SHORTEST PATH A*"
@@ -253,12 +213,8 @@ let rec private simulateVessel
                     let routeInfo =
                         { RouteId = Guid.NewGuid()
                           DestinationPortId = destinationPortId
-                          DestinationCoordinates =
-                            { Latitude = destinationPortData.Latitude
-                              Longitude = destinationPortData.Longitude }
-                          StartCoordinates =
-                            { Latitude = vessel.CurrentPosition.Latitude
-                              Longitude = vessel.CurrentPosition.Longitude }
+                          DestinationCoordinates = destinationPortData.Position
+                          StartCoordinates = vessel.CurrentPosition
                           Waypoints = waypoints
                           CurrentWaypointIndex = 0
                           StartedAt = DateTimeOffset.UtcNow }
@@ -334,10 +290,7 @@ let rec private simulateVessel
                                 let dockedVessel =
                                     { vessel with
                                         State = Docked destinationPortId
-                                        CurrentPosition =
-                                            { Latitude = portData.Latitude
-                                              Longitude = portData.Longitude
-                                              Timestamp = DateTimeOffset.UtcNow } }
+                                        CurrentPosition = portData.Position }
 
                                 // Wait while docked
                                 do! Task.Delay(random.Next(5000, 15000), cts)
@@ -407,8 +360,7 @@ let private runSimulation (gateway: CommandGateway.CommandGateway) (vesselCount:
                                         p.Name,
                                         None,
                                         "Simulation",
-                                        p.Latitude,
-                                        p.Longitude,
+                                        p.Position,
                                         None,
                                         random.Next(2, 4),
                                         Some "Simulation"

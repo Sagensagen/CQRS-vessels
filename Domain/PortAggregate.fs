@@ -5,6 +5,7 @@ open Shared.Api.Port
 open Domain.EventMetadata
 open FsToolkit.ErrorHandling
 open Domain.PortErrors
+open Shared.Api.Shared
 
 type ReservationState = {
     ReservationId: Guid
@@ -19,8 +20,7 @@ type PortState = {
     Name: string
     Locode: string option
     Country: string
-    Latitude: float
-    Longitude: float
+    Position: LatLong
     Timezone: string option
     MaxDocks: int
     Status: PortStatus
@@ -49,8 +49,7 @@ and RegisterPortCmd = {
     Name: string
     Locode: string option
     Country: string
-    Latitude: float
-    Longitude: float
+    Position: LatLong
     Timezone: string option
     MaxDocks: int
     Metadata: EventMetadata
@@ -101,8 +100,7 @@ and PortRegisteredEvt = {
     Name: string
     Locode: string option
     Country: string
-    Latitude: float
-    Longitude: float
+    Position: LatLong
     Timezone: string option
     MaxDocks: int
     RegisteredAt: DateTimeOffset
@@ -148,17 +146,14 @@ module private Validation =
         else
             Ok name
 
-    let validateLatitude (lat: float) : Result<float, PortError> =
-        if lat >= -90.0 && lat <= 90.0 then
-            Ok lat
+    let validateLatLong (pos: LatLong) : Result<LatLong, PortError> =
+        if
+            (pos.Latitude >= -90.0 && pos.Latitude <= 90.0)
+            && (pos.Longitude >= -180.0 && pos.Longitude <= 180.0)
+        then
+            Ok pos
         else
             Error(ValidationError "Latitude must be between -90 and 90")
-
-    let validateLongitude (lon: float) : Result<float, PortError> =
-        if lon >= -180.0 && lon <= 180.0 then
-            Ok lon
-        else
-            Error(ValidationError "Longitude must be between -180 and 180")
 
     let canReserveDocking (port: PortState) (reservationId: Guid) : Result<unit, PortError> =
         if not port.CanAcceptReservation then
@@ -194,8 +189,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
         result {
             let! _ = Validation.validateName cmd.Name
             let! _ = Validation.validateMaxDocks cmd.MaxDocks
-            let! _ = Validation.validateLatitude cmd.Latitude
-            let! _ = Validation.validateLongitude cmd.Longitude
+            let! _ = Validation.validateLatLong cmd.Position
 
             return [
                 PortRegistered {
@@ -203,8 +197,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
                     Name = cmd.Name
                     Locode = cmd.Locode
                     Country = cmd.Country
-                    Latitude = cmd.Latitude
-                    Longitude = cmd.Longitude
+                    Position = cmd.Position
                     Timezone = cmd.Timezone
                     MaxDocks = cmd.MaxDocks
                     RegisteredAt = cmd.Metadata.Timestamp
@@ -307,8 +300,7 @@ let evolve (state: PortState option) (event: PortEvent) : PortState option =
             Name = evt.Name
             Locode = evt.Locode
             Country = evt.Country
-            Latitude = evt.Latitude
-            Longitude = evt.Longitude
+            Position = evt.Position
             Timezone = evt.Timezone
             MaxDocks = evt.MaxDocks
             Status = PortStatus.Open

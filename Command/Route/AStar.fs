@@ -2,8 +2,7 @@ module Command.Route.AStar
 
 open FsToolkit.ErrorHandling
 open Npgsql
-open Serilog
-open Shared.Api.Route
+open Shared.Api.Shared
 
 let private srid = 4326
 let connectionString =
@@ -17,8 +16,6 @@ let private dataSource =
 
 let aStar (startLatLon: LatLong) (endLatLon: LatLong) =
     asyncResult {
-        printfn $"{startLatLon}"
-        printfn $"{endLatLon}"
         let sqlCommand =
             $"""
             WITH nodes AS (

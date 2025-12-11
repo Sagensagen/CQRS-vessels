@@ -8,6 +8,7 @@ open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Giraffe
 open Marten
+open Shared.Api.Shared
 open Shared.Api.Vessel
 open CommandGateway
 open Query.QueryHandlers
@@ -115,9 +116,6 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
                             []
                         |> List.rev
                         |> List.toArray
-
-                    deduplicatedWaypoints
-                    |> Array.iter (fun w -> printfn $"{w.Latitude},{w.Longitude}")
 
                     return!
                         commandGateway.UpdateOperationalStatus(

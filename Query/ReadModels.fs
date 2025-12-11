@@ -1,9 +1,9 @@
 module Query.ReadModels
 
 open System
+open Shared.Api.Shared
 open Shared.Api.Vessel
 open Shared.Api.Port
-open Shared.Api.Route
 
 [<CLIMutable>]
 type VesselReadModel =
@@ -12,7 +12,7 @@ type VesselReadModel =
       Mmsi: int
       Imo: int option
       Flag: string
-      Position: VesselPosition
+      Position: LatLong
       Length: float option
       Beam: float option
       Draught: float option
@@ -37,8 +37,7 @@ type PortReadModel =
       Name: string
       Locode: string option
       Country: string
-      Latitude: float
-      Longitude: float
+      Position: LatLong
       Timezone: string option
       MaxDocks: int
       Status: PortStatus

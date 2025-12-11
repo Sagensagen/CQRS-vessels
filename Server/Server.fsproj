@@ -11,7 +11,6 @@
     <Compile Include="CommandGateway.fs" />
     <Compile Include="RemotingHelpers.fs" />
     <Compile Include="Api\Vessel.fs" />
-    <Compile Include="Api\Route.fs" />
     <Compile Include="Api\Port.fs" />
     <Compile Include="Simulation.fs" />
     <Compile Include="Program.fs" />

@@ -2,6 +2,8 @@ module Shared.Api.Shared
 
 open System
 
+type LatLong = { Latitude: float; Longitude: float }
+
 type EventWrapperType =
     | Success
     | Fail
