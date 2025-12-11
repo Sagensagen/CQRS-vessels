@@ -23,7 +23,6 @@ type VesselProjection() =
           Beam = evt.Beam
           Draught = evt.Draught
           State = OperationalStatus.AtSea
-          Activity = VesselActivity.Idle
           VesselType = evt.VesselType
           CrewSize = evt.CrewSize
           CurrentPortId = None
@@ -53,7 +52,6 @@ type VesselProjection() =
     member _.Apply(evt: VesselOperationalStatusUpdatedEvt, current: VesselReadModel) =
         { current with
             State = evt.Status
-            Activity = evt.Activity
             LastUpdated = evt.UpdatedAt }
 
     member _.Apply(evt: VesselDecommissionedEvt, current: VesselReadModel) =

@@ -24,7 +24,6 @@ let private mapVesselToDTO (vessel: Query.ReadModels.VesselReadModel) : VesselDT
       Beam = vessel.Beam
       Draught = vessel.Draught
       State = vessel.State
-      Activity = vessel.Activity
       VesselType = vessel.VesselType
       Inserted = vessel.RegisteredAt
       CrewSize = vessel.CrewSize }
@@ -75,7 +74,7 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
         fun vesselId cmd ->
             asyncResult {
                 match cmd with
-                | Arrive portId -> return! commandGateway.StartDockingSaga(vesselId, portId, Some "API.Arrive")
+                | Arrive portId -> return! commandGateway.StartDockingSaga(vesselId, Some "API.Arrive")
 
                 | Depart portId ->
                     // Start the undocking process
@@ -85,7 +84,6 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
                         commandGateway.UpdateOperationalStatus(
                             vesselId,
                             OperationalStatus.Anchored "",
-                            VesselActivity.Idle,
                             Some "API.Anchor"
                         )
 
@@ -94,7 +92,6 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
                         commandGateway.UpdateOperationalStatus(
                             vesselId,
                             OperationalStatus.UnderMaintenance,
-                            VesselActivity.Maintenance,
                             Some "API.StartMaintenance"
                         )
                 | Decommission -> return! commandGateway.DecommissionVessel(vesselId, Some "API.Decommission")
@@ -103,11 +100,31 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
                     // Try calculate shortest path
                     let! waypoints = Command.Route.AStar.aStar route.StartCoordinates route.DestinationCoordinates
 
+                    // Remove consecutive duplicate waypoints
+                    let deduplicatedWaypoints =
+                        waypoints
+                        |> Array.fold
+                            (fun acc waypoint ->
+                                match acc with
+                                | [] -> [ waypoint ]
+                                | head :: _ when
+                                    head.Latitude = waypoint.Latitude && head.Longitude = waypoint.Longitude
+                                    ->
+                                    acc // Skip duplicate
+                                | _ -> waypoint :: acc)
+                            []
+                        |> List.rev
+                        |> List.toArray
+
+                    deduplicatedWaypoints
+                    |> Array.iter (fun w -> printfn $"{w.Latitude},{w.Longitude}")
+
                     return!
                         commandGateway.UpdateOperationalStatus(
                             vesselId,
-                            OperationalStatus.InRoute { route with Waypoints = waypoints },
-                            VesselActivity.Idle,
+                            OperationalStatus.InRoute
+                                { route with
+                                    Waypoints = deduplicatedWaypoints },
                             Some "API.Anchor"
                         )
 

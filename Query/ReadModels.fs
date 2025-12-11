@@ -17,7 +17,6 @@ type VesselReadModel =
       Beam: float option
       Draught: float option
       State: OperationalStatus
-      Activity: VesselActivity
       VesselType: VesselType
       CrewSize: int
       CurrentPortId: Guid option

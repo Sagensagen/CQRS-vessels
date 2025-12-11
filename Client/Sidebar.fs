@@ -641,25 +641,6 @@ let SideBar () =
 
               AddVesselDialog ()
               AddPortDialog ()
-              Fui.button [
-                button.text "Calculate route"
-                button.onClick (fun _ ->
-                  ApiClient.Route.CalculateRoute {Latitude = 22.277021994033145; Longitude = 114.27983352251238} {
-                    Latitude = 13.304458625007474
-                    Longitude = -91.73453432531353
-                  }
-                  |> Async.StartAsPromise
-                  |> Promise.map (fun res ->
-                    match res with
-                    | Ok accs -> ((UpdateCurrentRoute accs) |> setCtx)
-                    | Error e -> Toasts.errorToast setCtx "CreatePortFailed" "Could not create port" $"{e}" None
-                  )
-                  |> Promise.catchEnd (fun _ ->
-                    Toasts.successToast setCtx $"CreatePortSuccess" "Port created" $"Port  created"
-                  )
-
-                )
-              ]
             ]
           ]
 

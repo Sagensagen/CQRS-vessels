@@ -26,17 +26,7 @@ type RouteInfo = {
     StartedAt: DateTimeOffset
 }
 
-type VesselActivity =
-    | Idle
-    | CargoOperation of mode: CargoOperation * cargoId: Guid option
-    | Maintenance
-    | Refueling
-    | CrewChange
-and CargoOperation =
-    | Loading
-    | Unloading
-
-and OperationalStatus =
+type OperationalStatus =
     | AtSea
     | InRoute of routeInfo: RouteInfo
     | Docked of port: Guid
@@ -86,7 +76,6 @@ type VesselDTO = {
     Beam: float option
     Draught: float option
     State: OperationalStatus
-    Activity: VesselActivity
     VesselType: VesselType
     CrewSize: int
     Inserted: DateTimeOffset

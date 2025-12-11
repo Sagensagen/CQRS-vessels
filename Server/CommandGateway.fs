@@ -10,6 +10,7 @@ open Domain.VesselAggregate
 open Domain.PortAggregate
 open Serilog
 open Microsoft.FSharp.Reflection
+open Shared.Api.Vessel
 
 type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
     let logger = Log.ForContext<CommandGateway>()
@@ -191,12 +192,8 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         }
 
     member this.UpdateOperationalStatus
-        (
-            vesselId: Guid,
-            status: Shared.Api.Vessel.OperationalStatus,
-            activity: Shared.Api.Vessel.VesselActivity,
-            actor: string option
-        ) : Async<Result<Guid, Shared.Api.Vessel.VesselCommandErrors>> =
+        (vesselId: Guid, status: Shared.Api.Vessel.OperationalStatus, actor: string option)
+        : Async<Result<Guid, Shared.Api.Vessel.VesselCommandErrors>> =
         asyncResult {
             let metadata = Domain.EventMetadata.createInitialMetadata actor
 
@@ -204,7 +201,6 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                 UpdateOperationalStatus
                     { AggregateId = vesselId
                       Status = status
-                      Activity = activity
                       Metadata = metadata }
 
             let! _ = this.SendVesselCommand(vesselId, command)
@@ -345,106 +341,127 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
 
 
     member _.StartDockingSaga
-        (vesselId: Guid, portId: Guid, actor: string option)
+        (vesselId: Guid, actor: string option)
         : Async<Result<Guid, Shared.Api.Vessel.VesselCommandErrors>> =
         asyncResult {
             try
-                logger.Information("Starting docking saga for vessel {VesselId} at port {PortId}", vesselId, portId)
+                logger.Information("Starting docking saga for vessel {VesselId}", vesselId)
 
                 let vesselActor = getOrCreateVesselActor vesselId
-                let portActor = getOrCreatePortActor portId
 
-                logger.Information(
-                    "Actors initialized - Vessel: {VesselPath}, Port: {PortPath}",
-                    vesselActor.Path.ToString(),
-                    portActor.Path.ToString()
-                )
+                // First, get vessel state to extract destination port from route
+                let! vesselStateResponse =
+                    vesselActor.Ask<VesselActor.VesselStateResponse>(
+                        VesselActor.VesselActorMessage.GetState,
+                        commandTimeout
+                    )
 
-                let! portStateResponse =
-                    portActor.Ask<PortActor.PortStateResponse>(PortActor.PortActorMessage.GetState, commandTimeout)
+                match vesselStateResponse with
+                | VesselActor.VesselNotFound ->
+                    logger.Warning("Cannot start docking saga - Vessel {VesselId} has not been registered", vesselId)
+                    return! Error Shared.Api.Vessel.VesselCommandErrors.VesselNotFound
 
+                | VesselActor.VesselExists vesselState ->
+                    // Extract destination port from route
+                    match vesselState.State with
+                    | Shared.Api.Vessel.OperationalStatus.InRoute route ->
+                        let portId = route.DestinationPortId
+                        logger.Information("Vessel '{VesselName}' in route to port {PortId}", vesselState.Name, portId)
 
-                match portStateResponse with
-                | PortActor.PortNotFound ->
-                    logger.Warning("Cannot start docking saga - Port {PortId} has not been registered", portId)
-                    return! Error Shared.Api.Vessel.VesselCommandErrors.PortNotFound
-                | PortActor.PortExists portState ->
+                        // Validate vessel is not already docked
+                        do!
+                            vesselState.State.IsDocked
+                            |> Result.requireFalse Shared.Api.Vessel.VesselCommandErrors.VesselIsAlreadyArrived
 
-                    // Validate port can accept reservations
-                    if portState.Status <> Shared.Api.Port.PortStatus.Open then
+                        match vesselState.State with
+                        | InRoute route when route.CurrentWaypointIndex < route.Waypoints.Length ->
+                            return! Error Shared.Api.Vessel.VesselCommandErrors.NoDockingAvailableAtPort
+                        | _ -> ()
+                        // Get port actor and validate port state
+                        let portActor = getOrCreatePortActor portId
+
+                        logger.Information(
+                            "Actors initialized - Vessel: {VesselPath}, Port: {PortPath}",
+                            vesselActor.Path.ToString(),
+                            portActor.Path.ToString()
+                        )
+
+                        let! portStateResponse =
+                            portActor.Ask<PortActor.PortStateResponse>(
+                                PortActor.PortActorMessage.GetState,
+                                commandTimeout
+                            )
+
+                        match portStateResponse with
+                        | PortActor.PortNotFound ->
+                            logger.Warning("Cannot start docking saga - Port {PortId} has not been registered", portId)
+                            return! Error Shared.Api.Vessel.VesselCommandErrors.PortNotFound
+
+                        | PortActor.PortExists portState ->
+                            // Validate port can accept reservations
+                            if portState.Status <> Shared.Api.Port.PortStatus.Open then
+                                logger.Warning(
+                                    "Cannot start docking saga - Port {PortId} is {Status}",
+                                    portId,
+                                    portState.Status
+                                )
+
+                                return!
+                                    Error(
+                                        Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState(
+                                            "Open port",
+                                            $"Port '{portState.Name}' is currently {portState.Status}"
+                                        )
+                                    )
+                            elif portState.AvailableDocks <= 0 then
+                                logger.Warning(
+                                    "Cannot start docking saga - Port {PortId} has no available docks",
+                                    portId
+                                )
+
+                                return! Error Shared.Api.Vessel.VesselCommandErrors.NoDockingAvailableAtPort
+                            else
+                                logger.Information(
+                                    "Starting saga - Vessel '{VesselName}' docking at Port '{PortName}'",
+                                    vesselState.Name,
+                                    portState.Name
+                                )
+
+                                let metadata = Domain.EventMetadata.createInitialMetadata actor
+                                let sagaCoordinator = getSagaCoordinator ()
+
+                                let message =
+                                    SagaCoordinator.SagaCoordinatorMessage.StartDockingSaga(vesselId, portId, metadata)
+
+                                let! sagaId = sagaCoordinator.Ask<Guid>(message, commandTimeout)
+                                logger.Information("Docking saga {SagaId} started successfully", sagaId)
+                                return! Ok sagaId
+
+                    | _ ->
                         logger.Warning(
-                            "Cannot start docking saga - Port {PortId} is {Status}",
-                            portId,
-                            portState.Status
+                            "Cannot start docking saga - Vessel {VesselId} is not in route (current state: {State})",
+                            vesselId,
+                            vesselState.State
                         )
 
                         return!
                             Error(
                                 Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState(
-                                    "Open port",
-                                    $"Port '{portState.Name}' is currently {portState.Status}"
+                                    "in route",
+                                    $"vessel is {vesselState.State}"
                                 )
                             )
-                    elif portState.AvailableDocks <= 0 then
-                        logger.Warning("Cannot start docking saga - Port {PortId} has no available docks", portId)
-
-                        return! Error Shared.Api.Vessel.VesselCommandErrors.NoDockingAvailableAtPort
-                    else
-                        // Validate vessel exists
-                        let! vesselStateResponse =
-                            vesselActor.Ask<VesselActor.VesselStateResponse>(
-                                VesselActor.VesselActorMessage.GetState,
-                                commandTimeout
-                            )
-
-                        match vesselStateResponse with
-                        | VesselActor.VesselNotFound ->
-                            logger.Warning(
-                                "Cannot start docking saga - Vessel {VesselId} has not been registered",
-                                vesselId
-                            )
-
-                            return! Error Shared.Api.Vessel.VesselCommandErrors.VesselNotFound
-                        | VesselActor.VesselExists vesselState ->
-                            logger.Information(
-                                "Starting saga - Vessel '{VesselName}' docking at Port '{PortName}'",
-                                vesselState.Name,
-                                portState.Name
-                            )
-
-                            do!
-                                vesselState.State.IsDocked
-                                |> Result.requireFalse Shared.Api.Vessel.VesselCommandErrors.VesselIsAlreadyArrived
-
-                            let metadata = Domain.EventMetadata.createInitialMetadata actor
-                            let sagaCoordinator = getSagaCoordinator ()
-
-                            let message =
-                                SagaCoordinator.SagaCoordinatorMessage.StartDockingSaga(vesselId, portId, metadata)
-
-                            let! sagaId = sagaCoordinator.Ask<Guid>(message, commandTimeout)
-                            logger.Information("Docking saga {SagaId} started successfully", sagaId)
-                            return! Ok sagaId
 
             with
             | :? TaskCanceledException ->
-                logger.Error(
-                    "Failed to start docking saga for vessel {VesselId} at port {PortId} - timed out",
-                    vesselId,
-                    portId
-                )
+                logger.Error("Failed to start docking saga for vessel {VesselId} - timed out", vesselId)
 
                 return!
                     Error(
                         Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("responding", "Saga start timed out")
                     )
             | ex ->
-                logger.Error(
-                    ex,
-                    "Failed to start docking saga for vessel {VesselId} at port {PortId}",
-                    vesselId,
-                    portId
-                )
+                logger.Error(ex, "Failed to start docking saga for vessel {VesselId}", vesselId)
 
                 return! Error(Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState("operational", ex.Message))
         }
