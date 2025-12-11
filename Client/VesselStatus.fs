@@ -26,7 +26,6 @@ let private updateOperationalStatus
         callback ()
       | Error e -> Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None
     finally
-      printfn "sdsd"
       setIsFetching false
   )
   |> Promise.catchEnd (fun e ->

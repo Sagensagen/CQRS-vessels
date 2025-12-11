@@ -47,13 +47,3 @@ type PortReadModel =
       RegisteredAt: DateTimeOffset
       LastUpdated: DateTimeOffset
       Version: int64 }
-
-[<CLIMutable>]
-type EventHistoryEntry =
-    { Id: Guid
-      AggregateId: Guid
-      AggregateType: string
-      EventType: string
-      EventData: string
-      Timestamp: DateTimeOffset
-      Version: int64 }

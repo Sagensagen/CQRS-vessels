@@ -372,8 +372,8 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                             |> Result.requireFalse Shared.Api.Vessel.VesselCommandErrors.VesselIsAlreadyArrived
 
                         match vesselState.State with
-                        | InRoute route when route.CurrentWaypointIndex < route.Waypoints.Length ->
-                            return! Error Shared.Api.Vessel.VesselCommandErrors.NoDockingAvailableAtPort
+                        | InRoute route when route.CurrentWaypointIndex + 1 < route.Waypoints.Length ->
+                            return! Error Shared.Api.Vessel.VesselCommandErrors.RouteNotFinished
                         | _ -> ()
                         // Get port actor and validate port state
                         let portActor = getOrCreatePortActor portId

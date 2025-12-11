@@ -101,6 +101,8 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
                     // Try calculate shortest path
                     let! waypoints = Command.Route.AStar.aStar route.StartCoordinates route.DestinationCoordinates
 
+                    if waypoints.Length = 0 then
+                        return! Error VesselCommandErrors.CargoNotFound
                     // Remove consecutive duplicate waypoints
                     let deduplicatedWaypoints =
                         waypoints
