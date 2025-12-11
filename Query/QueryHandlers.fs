@@ -79,7 +79,8 @@ let getVesselEvents (vesselId: Guid) (session: IQuerySession) =
                         match ev.Status with
                         | AtSea -> $"{ev.Status}"
                         | InRoute route ->
-                            $"InRoute: towards port {route.DestinationPortId}, {route.CurrentWaypointIndex}/{route.Waypoints.Length} steps"
+                            // +1 for index relative to the length
+                            $"InRoute: towards port {route.DestinationPortId}, {route.CurrentWaypointIndex + 1}/{route.Waypoints.Length} steps"
                         | Docked port -> $"{ev.Status}"
                         | Anchored pos -> $"{ev.Status}"
                         | UnderMaintenance -> $"{ev.Status}"

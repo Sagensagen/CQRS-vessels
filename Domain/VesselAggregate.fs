@@ -138,6 +138,15 @@ module private Validation =
         else
             Ok name
 
+    let validatePosition (position: LatLong) : Result<LatLong, VesselError> =
+        if NavigationBounds.isWithinBounds position then
+            Ok position
+        else
+            Error(
+                ValidationError
+                    $"Position ({position.Latitude}, {position.Longitude}) is outside navigable network bounds (Lat: {NavigationBounds.MinLatitude} to {NavigationBounds.MaxLatitude}, Lon: {NavigationBounds.MinLongitude} to {NavigationBounds.MaxLongitude})"
+            )
+
     let canDepartFromPort (state: VesselState) : Result<unit, VesselError> =
         match state.State, state.CurrentPortId with
         | OperationalStatus.Docked _, Some _ -> Ok()
@@ -149,7 +158,7 @@ module private Validation =
         match state.State with
         | OperationalStatus.AtSea -> Ok()
         | OperationalStatus.InRoute route ->
-            if route.CurrentWaypointIndex = route.Waypoints.Length then
+            if route.CurrentWaypointIndex + 1 = route.Waypoints.Length then
                 Ok()
             else
                 Error(
@@ -173,6 +182,7 @@ let decide
             let! _ = Validation.validateMmsi cmd.Mmsi
             let! _ = Validation.validateImo cmd.Imo
             let! _ = Validation.validateCrewSize cmd.CrewSize
+            let! _ = Validation.validatePosition cmd.Position
 
             return [
                 VesselRegistered {
@@ -258,8 +268,8 @@ let decide
     | AdvanceRouteWaypoint cmd, Some vessel ->
         match vessel.State with
         | OperationalStatus.InRoute route ->
-            let nextIndex = route.CurrentWaypointIndex + 1
 
+            let nextIndex = route.CurrentWaypointIndex + 1
             if nextIndex >= route.Waypoints.Length then
                 Error NoMoreWaypoints
             else

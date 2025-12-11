@@ -165,8 +165,12 @@ let private random = Random()
 let private randomName prefix = $"{prefix}-{(random.Next(1000, 9999))}"
 
 let private randomPosition () =
-    { Latitude = (random.NextDouble() * 180.0) - 90.0
-      Longitude = (random.NextDouble() * 360.0) - 180.0 }
+    // Generate position within navigable network bounds (-60° to 76.5° latitude)
+    let latRange = NavigationBounds.MaxLatitude - NavigationBounds.MinLatitude
+    let lonRange = NavigationBounds.MaxLongitude - NavigationBounds.MinLongitude
+
+    { Latitude = NavigationBounds.MinLatitude + (random.NextDouble() * latRange)
+      Longitude = NavigationBounds.MinLongitude + (random.NextDouble() * lonRange) }
 
 let private randomVesselType () =
     let types = [| ContainerShip; BulkCarrier; Passenger; Fishing |]
@@ -208,40 +212,72 @@ let rec private simulateVessel
                             Log.Error "FAILED TO GET SHORTEST PATH A*"
                             [||])
 
-
-
-                    let routeInfo =
-                        { RouteId = Guid.NewGuid()
-                          DestinationPortId = destinationPortId
-                          DestinationCoordinates = destinationPortData.Position
-                          StartCoordinates = vessel.CurrentPosition
-                          Waypoints = waypoints
-                          CurrentWaypointIndex = 0
-                          StartedAt = DateTimeOffset.UtcNow }
-
-                    let! result =
-                        gateway.UpdateOperationalStatus(
-                            vessel.VesselId,
-                            (OperationalStatus.InRoute routeInfo),
-                            Some "Simulation"
+                    if waypoints.Length = 0 then
+                        Log.Warning(
+                            "A* RETURNED EMPTY ROUTE for {VesselName} at position ({Lat}, {Lon}). Relocating vessel to valid position.",
+                            vessel.Name,
+                            vessel.CurrentPosition.Latitude,
+                            vessel.CurrentPosition.Longitude
                         )
 
-                    match result with
-                    | Ok _ ->
-                        Log.Information("{VesselName} successfully created route", vessel.Name)
+                        // Generate a new valid position and update the vessel
+                        let newPosition = randomPosition ()
 
-                        let inRouteVessel =
-                            { vessel with
-                                State = InRoute(destinationPortId, 0, 0) } // Will update waypoint count on first advance
+                        let! updateResult =
+                            gateway.UpdateVesselPosition(vessel.VesselId, newPosition, Some "Simulation")
 
-                        // Start advancing immediately
-                        do! Task.Delay(1000, cts)
-                        return! simulateVessel inRouteVessel portMap gateway vesselCount cts
-                    | Error err ->
-                        Log.Warning("{VesselName} failed to create route: {Error}", vessel.Name, err)
-                        // Wait and try again
-                        do! Task.Delay(5000, cts)
-                        return! simulateVessel vessel portMap gateway vesselCount cts
+                        match updateResult with
+                        | Ok _ ->
+                            Log.Information(
+                                "{VesselName} relocated to ({Lat}, {Lon})",
+                                vessel.Name,
+                                newPosition.Latitude,
+                                newPosition.Longitude
+                            )
+
+                            let relocatedVessel =
+                                { vessel with
+                                    CurrentPosition = newPosition }
+
+                            do! Task.Delay(2000, cts)
+                            return! simulateVessel relocatedVessel portMap gateway vesselCount cts
+                        | Error err ->
+                            Log.Error("{VesselName} failed to relocate: {Error}", vessel.Name, err)
+                            do! Task.Delay(5000, cts)
+                            return! simulateVessel vessel portMap gateway vesselCount cts
+                    else
+                        let routeInfo =
+                            { RouteId = Guid.NewGuid()
+                              DestinationPortId = destinationPortId
+                              DestinationCoordinates = destinationPortData.Position
+                              StartCoordinates = vessel.CurrentPosition
+                              Waypoints = waypoints
+                              CurrentWaypointIndex = 0
+                              StartedAt = DateTimeOffset.UtcNow }
+
+                        let! result =
+                            gateway.UpdateOperationalStatus(
+                                vessel.VesselId,
+                                (OperationalStatus.InRoute routeInfo),
+                                Some "Simulation"
+                            )
+
+                        match result with
+                        | Ok _ ->
+                            Log.Information("{VesselName} successfully created route", vessel.Name)
+
+                            let inRouteVessel =
+                                { vessel with
+                                    State = InRoute(destinationPortId, 0, 0) } // Will update waypoint count on first advance
+
+                            // Start advancing immediately
+                            do! Task.Delay(1000, cts)
+                            return! simulateVessel inRouteVessel portMap gateway vesselCount cts
+                        | Error err ->
+                            Log.Warning("{VesselName} failed to create route: {Error}", vessel.Name, err)
+                            // Wait and try again
+                            do! Task.Delay(5000, cts)
+                            return! simulateVessel vessel portMap gateway vesselCount cts
 
                 | InRoute(destinationPortId, currentWaypoint, totalWaypoints) ->
                     // In route: advance to next waypoint
@@ -293,7 +329,7 @@ let rec private simulateVessel
                                         CurrentPosition = portData.Position }
 
                                 // Wait while docked
-                                do! Task.Delay(random.Next(5000, 15000), cts)
+                                do! Task.Delay(random.Next(5000, 10000), cts)
                                 return! simulateVessel dockedVessel portMap gateway vesselCount cts
                             | Error dockErr ->
                                 Log.Warning("{VesselName} failed to dock: {Error}", vessel.Name, dockErr)
@@ -308,7 +344,6 @@ let rec private simulateVessel
                             return! simulateVessel vessel portMap gateway vesselCount cts
 
                 | Docked portId ->
-                    // Docked: request departure
                     Log.Information("{VesselName} requesting departure from port {PortId}", vessel.Name, portId)
 
                     let! result = gateway.StartUndockingSaga(vessel.VesselId, portId, Some "Simulation")
@@ -318,7 +353,6 @@ let rec private simulateVessel
                         Log.Information("{VesselName} successfully departed", vessel.Name)
                         let atSeaVessel = { vessel with State = AtSea }
 
-                        // Wait before next operation
                         do! Task.Delay(random.Next(5000, 15000), cts)
 
                         return! simulateVessel atSeaVessel portMap gateway vesselCount cts

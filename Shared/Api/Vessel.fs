@@ -87,6 +87,7 @@ type VesselCommandErrors =
     | VesselAlreadyDeparted
     | VesselIsAlreadyArrived
     | NoDockingAvailableAtPort
+    | RouteNotFinished
     | InvalidVesselState of expected: string * actual: string
     | CargoNotFound
     | PortNotFound

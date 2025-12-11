@@ -6,10 +6,18 @@ open Feliz
 open Feliz.PigeonMaps
 open Shared.Api.Vessel
 
+// Deterministic color based on the Guid given
+let guidToColor (guid: System.Guid) : string =
+  let bytes = guid.ToByteArray ()
+  let r = int bytes.[0]
+  let g = int bytes.[1]
+  let b = int bytes.[2]
+  sprintf "#%02x%02x%02x" r g b
+
 // Shows statistics of all the ports and vessels in the mixer
 [<ReactComponent>]
 let private StatisticsPanel () =
-  let ctx, _setCtx = Context.useCtx ()
+  let ctx, _setCtx = useCtx ()
   Html.div [
     prop.style [
       style.position.absolute
@@ -46,7 +54,7 @@ let private StatisticsPanel () =
 
 [<ReactComponent>]
 let FleetMap () =
-  let ctx, setCtx = Context.useCtx ()
+  let ctx, setCtx = useCtx ()
   Fui.card [
     card.style [
       style.display.flex
@@ -60,50 +68,56 @@ let FleetMap () =
         map.zoom 5
         map.markers [
           yield!
-            match ctx.SelectedVessel with
-            | None -> [||]
-            | Some vessel ->
+            ctx.AllVessels
+            |> Array.map (fun vessel ->
+              let color =
+                match ctx.SelectedVessel with
+                | Some v when v.Id = vessel.Id -> Theme.tokens.colorPaletteBerryBackground3
+                | _ -> guidToColor vessel.Id
               match vessel.State with
               | InRoute route ->
                 route.Waypoints
                 |> Array.map (fun latLong ->
                   PigeonMaps.marker [
                     marker.anchor (latLong.Latitude, latLong.Longitude)
-                    marker.offsetLeft 8
-                    marker.offsetTop 8
-                    marker.render (fun marker -> [
+                    marker.offsetLeft 5
+                    marker.offsetTop 5
+                    marker.render (fun _ -> [
                       Fui.icon.circleFilled [
-                        icon.style [style.fontSize 8]
-                        icon.primaryFill Theme.tokens.colorStatusSuccessBackground3
+                        icon.style [style.fontSize 5]
+                        icon.primaryFill color
                       ]
                     ])
                   ]
                 )
               | _ -> [||]
+            )
+            |> Array.concat
           yield!
             ctx.AllVessels
             |> Array.map (fun vessel ->
+              let color = guidToColor vessel.Id
               PigeonMaps.marker [
                 marker.onClick (fun _ -> setCtx (UpdateSelectedVessel (Some vessel)))
                 marker.anchor (vessel.Position.Latitude, vessel.Position.Longitude)
-                marker.offsetLeft 25
-                marker.offsetTop 25
+                marker.offsetLeft 12
+                marker.offsetTop 12
                 marker.render (fun _marker -> [
                   Fui.tooltip [
                     tooltip.content vessel.Name
                     tooltip.children [
                       Fui.button [
-                        button.size.large
                         button.appearance.transparent
-                        button.children [
+                        button.size.medium
+                        button.icon (
                           Fui.icon.vehicleShipFilled [
-                            icon.style [style.fontSize 25]
+                            icon.style [style.fontSize 25; style.paddingLeft 0]
                             match ctx.SelectedVessel with
                             | Some v when v.Id = vessel.Id ->
                               icon.primaryFill Theme.tokens.colorPaletteBerryBackground3
-                            | _ -> icon.primaryFill Theme.tokens.colorStatusDangerBorderActive
+                            | _ -> icon.primaryFill color
                           ]
-                        ]
+                        )
                       ]
                     ]
                   ]
@@ -117,7 +131,7 @@ let FleetMap () =
                 marker.anchor (port.Position.Latitude, port.Position.Longitude)
                 marker.offsetLeft 102
                 marker.offsetTop 35
-                marker.render (fun marker -> [
+                marker.render (fun _ -> [
                   Fui.tooltip [
                     tooltip.content (
                       Html.div [
