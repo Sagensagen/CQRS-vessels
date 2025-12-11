@@ -97,11 +97,11 @@ let private AddPortDialog () =
                       field.children [
                         Fui.input [
                           input.type'.number
-                          input.value form.Latitude
+                          input.value form.Position.Latitude
                           input.onChange (fun (v: string) ->
                             Double.TryParse v
                             |> function
-                              | true, f -> setForm {form with Latitude = f}
+                              | true, f -> setForm {form with Position = {form.Position with Latitude = f}}
                               | _ -> ()
                           )
                           input.placeholder "0011.0"
@@ -114,11 +114,11 @@ let private AddPortDialog () =
                       field.children [
                         Fui.input [
                           input.type'.number
-                          input.value form.Longitude
+                          input.value form.Position.Longitude
                           input.onChange (fun (v: string) ->
                             Double.TryParse v
                             |> function
-                              | true, f -> setForm {form with Longitude = f}
+                              | true, f -> setForm {form with Position = {form.Position with Longitude = f}}
                               | _ -> ()
                           )
                           input.placeholder "0011.0"

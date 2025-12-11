@@ -18,8 +18,7 @@ let private mapPortToDTO (port: Query.ReadModels.PortReadModel) : PortDTO =
       Status = port.Status
       Locode = port.Locode
       Country = port.Country
-      Latitude = port.Latitude
-      Longitude = port.Longitude
+      Position = port.Position
       Timezone = port.Timezone
       MaxDocks = port.MaxDocks
       CurrentDocked = port.CurrentDocked
@@ -40,8 +39,7 @@ let private portApi (ctx: HttpContext) : IPortApi =
                         newPort.Name,
                         newPort.Locode,
                         newPort.Country,
-                        newPort.Latitude,
-                        newPort.Longitude,
+                        newPort.Position,
                         newPort.Timezone,
                         newPort.MaxDocks,
                         Some "API.CreatePort"

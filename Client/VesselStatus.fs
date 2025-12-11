@@ -5,6 +5,7 @@ open Browser.Types
 open Feliz.PigeonMaps
 open Feliz
 open FS.FluentUI
+open Shared.Api.Shared
 open Shared.Api.Vessel
 open Fable.Core
 
@@ -33,7 +34,7 @@ let private updateOperationalStatus
     Toasts.errorToast setCtx "updateVesselStatusError" "Could not update" $"{e}" None
   )
 
-let private updatePosition (vesselId: Guid) (position: VesselPosition) callback setCtx =
+let private updatePosition (vesselId: Guid) (position: LatLong) callback setCtx =
   ApiClient.Vessel.UpdatePosition vesselId position
   |> Async.StartAsPromise
   |> Promise.tap (fun res ->
@@ -49,8 +50,7 @@ let private updatePosition (vesselId: Guid) (position: VesselPosition) callback 
 
 [<ReactComponent>]
 let private VesselPositionDialog (vessel: VesselDTO) =
-  let position, setPosition =
-    React.useState<VesselPosition option> (Some vessel.Position)
+  let position, setPosition = React.useState<LatLong option> (Some vessel.Position)
   let ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
@@ -108,7 +108,7 @@ let private VesselPositionDialog (vessel: VesselDTO) =
                     | None -> ()
                     | Some pos -> map.center (pos.Latitude, pos.Longitude)
                     map.onClick (fun pos ->
-                      {Latitude = fst pos.latLng; Longitude = snd pos.latLng; Timestamp = DateTimeOffset.UtcNow}
+                      {Latitude = fst pos.latLng; Longitude = snd pos.latLng}
                       |> Some
                       |> setPosition
                     )
@@ -485,7 +485,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                                 StartRoute {
                                   route with
                                       DestinationPortId = port.Id
-                                      DestinationCoordinates = {Latitude = port.Latitude; Longitude = port.Longitude}
+                                      DestinationCoordinates = port.Position
                                 }
                               )
                             )

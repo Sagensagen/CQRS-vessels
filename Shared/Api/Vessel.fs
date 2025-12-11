@@ -1,7 +1,7 @@
 module Shared.Api.Vessel
 
 open System
-open Shared.Api.Route
+open Shared.Api.Shared
 
 type VesselType =
     | ContainerShip
@@ -9,12 +9,6 @@ type VesselType =
     | Passenger
     | Fishing
     | Unknown of string
-
-type VesselPosition = {
-    Latitude: float
-    Longitude: float
-    Timestamp: DateTimeOffset
-}
 
 type RouteInfo = {
     RouteId: Guid
@@ -36,7 +30,7 @@ type OperationalStatus =
 
 type RegisterVesselRequest = {
     Name: string
-    Position: VesselPosition
+    Position: LatLong
     Mmsi: int
     Imo: int option
     Flag: string
@@ -49,11 +43,7 @@ type RegisterVesselRequest = {
 
     static member DefaultEmpty = {
         Name = ""
-        Position = {
-            Latitude = 0000
-            Longitude = 0000
-            Timestamp = DateTimeOffset.UtcNow
-        }
+        Position = { Latitude = 0000; Longitude = 0000 }
         Mmsi = 0
         Imo = None
         Flag = ""
@@ -69,7 +59,7 @@ type VesselDTO = {
     Registered: DateTimeOffset
     Name: string
     Mmsi: int
-    Position: VesselPosition
+    Position: LatLong
     Imo: int option
     Flag: string
     Length: float option
@@ -109,6 +99,6 @@ type IVesselApi = {
     GetVessel: Guid -> Async<Result<VesselDTO, VesselQueryErrors>>
     GetAllVessels: unit -> Async<Result<VesselDTO array, VesselQueryErrors>>
     UpdateOperationalStatus: Guid -> VesselStatusCommand -> Async<Result<Guid, VesselCommandErrors>>
-    UpdatePosition: Guid -> VesselPosition -> Async<Result<Guid, VesselCommandErrors>>
+    UpdatePosition: Guid -> LatLong -> Async<Result<Guid, VesselCommandErrors>>
     GetEvents: Guid -> Async<Result<Shared.EventWrapper array, VesselQueryErrors>>
 }

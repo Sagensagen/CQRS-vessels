@@ -4,7 +4,6 @@ open System
 open FS.FluentUI
 open Feliz
 open Shared.Api.Port
-open Shared.Api.Route
 open Shared.Api.Simulation
 open Shared.Api.Vessel
 

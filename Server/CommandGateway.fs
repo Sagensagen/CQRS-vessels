@@ -130,7 +130,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             mmsi: int,
             imo: int option,
             flag: string,
-            position: Shared.Api.Vessel.VesselPosition,
+            position: Shared.Api.Shared.LatLong,
             length: float option,
             beam: float option,
             draught: float option,
@@ -161,7 +161,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         }
 
     member this.UpdateVesselPosition
-        (vesselId: Guid, position: Shared.Api.Vessel.VesselPosition, actor: string option)
+        (vesselId: Guid, position: Shared.Api.Shared.LatLong, actor: string option)
         : Async<Result<Guid, Shared.Api.Vessel.VesselCommandErrors>> =
         asyncResult {
             let metadata = Domain.EventMetadata.createInitialMetadata actor
@@ -271,8 +271,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             name: string,
             locode: string option,
             country: string,
-            latitude: float,
-            longitude: float,
+            position: Shared.Api.Shared.LatLong,
             timezone: string option,
             maxDocks: int,
             actor: string option
@@ -286,8 +285,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                       Name = name
                       Locode = locode
                       Country = country
-                      Latitude = latitude
-                      Longitude = longitude
+                      Position = position
                       Timezone = timezone
                       MaxDocks = maxDocks
                       Metadata = metadata }

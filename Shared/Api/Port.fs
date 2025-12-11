@@ -1,6 +1,7 @@
 module Shared.Api.Port
 
 open System
+open Shared.Api.Shared
 
 type PortStatus =
     | Open
@@ -10,8 +11,7 @@ type RegisterPortRequest = {
     Name: string
     Locode: string option
     Country: string
-    Latitude: float
-    Longitude: float
+    Position: LatLong
     MaxDocks: int
     Timezone: string option
 } with
@@ -20,8 +20,7 @@ type RegisterPortRequest = {
         Name = ""
         Locode = None
         Country = "Vietnam"
-        Latitude = 0.
-        Longitude = 0.
+        Position = { Latitude = 0.; Longitude = 0. }
         MaxDocks = 10
         Timezone = None
     }
@@ -32,8 +31,7 @@ type PortDTO = {
     Status: PortStatus
     Locode: string option
     Country: string
-    Latitude: float
-    Longitude: float
+    Position: LatLong
     Timezone: string option
     MaxDocks: int
     CurrentDocked: int
