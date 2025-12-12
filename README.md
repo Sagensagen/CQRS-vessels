@@ -47,12 +47,12 @@ docker-compose up -d
 ```
 #### Run client
 ```bash
-# Run both client and server in watch mode from `/Client`
-dotnet fable watch -s -o .build -e .jsx --verbose --run bunx --bun vite -c ../vite.config.js
-```
-or from root
-```bash
 bun fable
+```
+Or
+```bash
+# Run `/Client`
+dotnet fable watch -s -o .build -e .jsx --verbose --run bunx --bun vite -c ../vite.config.js
 ```
 #### Run Server
 
