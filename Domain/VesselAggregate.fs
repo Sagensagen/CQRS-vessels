@@ -168,6 +168,13 @@ module private Validation =
                 )
         | _ -> Error(InvalidStateTransition("at sea or in route", string state.State))
 
+/// <summary>
+/// Validates the incoming command with the vessel state given. Returns a list of events that shall
+/// be created from this command if validation is passed
+/// </summary>
+/// <param name="state">Current vessel state</param>
+/// <param name="command">Command to process</param>
+/// <returns>List of events to apply, or validation error</returns>
 let decide
     (state: VesselState option)
     (command: VesselCommand)
@@ -211,7 +218,7 @@ let decide
     | UpdatePosition _, None -> Error Shared.Api.Vessel.VesselNotFound
 
     | ArriveAtPort cmd, Some vessel ->
-        match Validation.canArriveAtPort vessel with // TODO check if in route and is at last route idx and the port is correct. Maybe just drop the portId in the command and rely on the routeInfo??
+        match Validation.canArriveAtPort vessel with
         | Ok() ->
             Ok [
                 VesselArrived {
@@ -236,7 +243,7 @@ let decide
                 VesselDeparted { FromPortId = portId; DepartedAt = cmd.Metadata.Timestamp }
                 VesselOperationalStatusUpdated {
                     Status = OperationalStatus.AtSea
-                    UpdatedAt = cmd.Metadata.Timestamp
+                    UpdatedAt = cmd.Metadata.Timestamp // Force this to happen after departed :)
                 }
             ]
         }

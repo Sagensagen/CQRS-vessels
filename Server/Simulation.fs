@@ -268,7 +268,7 @@ let rec private simulateVessel
 
                             let inRouteVessel =
                                 { vessel with
-                                    State = InRoute(destinationPortId, 0, 0) } // Will update waypoint count on first advance
+                                    State = InRoute(destinationPortId, 0, routeInfo.Waypoints.Length) } // Will update waypoint count on first advance
 
                             // Start advancing immediately
                             do! Task.Delay(1000, cts)
@@ -301,47 +301,36 @@ let rec private simulateVessel
                         // Wait 4 seconds between advances
                         do! Task.Delay(2000, cts)
                         return! simulateVessel updatedVessel portMap gateway vesselCount cts
-                    | Error err ->
-                        // Check if we've reached the end of the route
-                        if err.ToString().Contains("no more waypoints") then
-                            Log.Information(
-                                "{VesselName} reached end of route, attempting to dock at destination port",
-                                vessel.Name
-                            )
+                    | Error VesselCommandErrors.NoMoreWaypoints ->
+                        let! dockResult = gateway.StartDockingSaga(vessel.VesselId, Some "Simulation")
 
-                            let! dockResult = gateway.StartDockingSaga(vessel.VesselId, Some "Simulation")
+                        match dockResult with
+                        | Ok sagaId ->
+                            Log.Information("{VesselName} successfully docked (Saga: {SagaId})", vessel.Name, sagaId)
 
-                            match dockResult with
-                            | Ok sagaId ->
-                                Log.Information(
-                                    "{VesselName} successfully docked (Saga: {SagaId})",
-                                    vessel.Name,
-                                    sagaId
-                                )
+                            // Find the port data to get coordinates
+                            let portData =
+                                portMap |> Array.find (fun (portId, _) -> portId = destinationPortId) |> snd
 
-                                // Find the port data to get coordinates
-                                let portData =
-                                    portMap |> Array.find (fun (portId, _) -> portId = destinationPortId) |> snd
+                            let dockedVessel =
+                                { vessel with
+                                    State = Docked destinationPortId
+                                    CurrentPosition = portData.Position }
 
-                                let dockedVessel =
-                                    { vessel with
-                                        State = Docked destinationPortId
-                                        CurrentPosition = portData.Position }
-
-                                // Wait while docked
-                                do! Task.Delay(random.Next(5000, 10000), cts)
-                                return! simulateVessel dockedVessel portMap gateway vesselCount cts
-                            | Error dockErr ->
-                                Log.Warning("{VesselName} failed to dock: {Error}", vessel.Name, dockErr)
-                                // Return to sea and try again
-                                let atSeaVessel = { vessel with State = AtSea }
-                                do! Task.Delay(5000, cts)
-                                return! simulateVessel atSeaVessel portMap gateway vesselCount cts
-                        else
-                            Log.Warning("{VesselName} failed to advance waypoint: {Error}", vessel.Name, err)
-                            // Wait and try again
-                            do! Task.Delay(4000, cts)
-                            return! simulateVessel vessel portMap gateway vesselCount cts
+                            // Wait while docked
+                            do! Task.Delay(random.Next(5000, 10000), cts)
+                            return! simulateVessel dockedVessel portMap gateway vesselCount cts
+                        | Error dockErr ->
+                            Log.Warning("{VesselName} failed to dock: {Error}", vessel.Name, dockErr)
+                            // Return to sea and try again
+                            let atSeaVessel = { vessel with State = AtSea }
+                            do! Task.Delay(5000, cts)
+                            return! simulateVessel atSeaVessel portMap gateway vesselCount cts
+                    | _ ->
+                        Log.Warning("{VesselName} failed to advance waypoint: {Error}", vessel.Name, result)
+                        // Wait and try again
+                        do! Task.Delay(4000, cts)
+                        return! simulateVessel vessel portMap gateway vesselCount cts
 
                 | Docked portId ->
                     Log.Information("{VesselName} requesting departure from port {PortId}", vessel.Name, portId)
