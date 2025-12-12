@@ -4,7 +4,6 @@ open System
 open Shared.Api.Port
 open Domain.EventMetadata
 open FsToolkit.ErrorHandling
-open Domain.PortErrors
 open Shared.Api.Shared
 
 type ReservationState = {
@@ -132,13 +131,13 @@ and PortOpenedEvt = { OpenedAt: DateTimeOffset }
 and PortClosedEvt = { ClosedAt: DateTimeOffset }
 
 module private Validation =
-    let validateMaxDocks (maxDocks: int) : Result<int, PortError> =
+    let validateMaxDocks (maxDocks: int) : Result<int, PortCommandErrors> =
         if maxDocks > 0 && maxDocks <= 1000 then
             Ok maxDocks
         else
             Error(ValidationError "MaxDocks must be between 1 and 1000")
 
-    let validateName (name: string) : Result<string, PortError> =
+    let validateName (name: string) : Result<string, PortCommandErrors> =
         if String.IsNullOrWhiteSpace(name) then
             Error(ValidationError "Port name cannot be empty")
         elif name.Length > 200 then
@@ -146,7 +145,7 @@ module private Validation =
         else
             Ok name
 
-    let validateLatLong (pos: LatLong) : Result<LatLong, PortError> =
+    let validateLatLong (pos: LatLong) : Result<LatLong, PortCommandErrors> =
         if
             (pos.Latitude >= -90.0 && pos.Latitude <= 90.0)
             && (pos.Longitude >= -180.0 && pos.Longitude <= 180.0)
@@ -155,7 +154,10 @@ module private Validation =
         else
             Error(ValidationError "Latitude must be between -90 and 90")
 
-    let canReserveDocking (port: PortState) (reservationId: Guid) : Result<unit, PortError> =
+    let canReserveDocking
+        (port: PortState)
+        (reservationId: Guid)
+        : Result<unit, PortCommandErrors> =
         if not port.CanAcceptReservation then
             Error NoDockingSpaceAvailable
         elif port.PendingReservations.ContainsKey(reservationId) then
@@ -163,25 +165,28 @@ module private Validation =
         else
             Ok()
 
-    let hasReservation (port: PortState) (reservationId: Guid) : Result<unit, PortError> =
+    let hasReservation (port: PortState) (reservationId: Guid) : Result<unit, PortCommandErrors> =
         if port.PendingReservations.ContainsKey(reservationId) then
             Ok()
         else
             Error ReservationNotFound
 
-    let vesselIsNotDocked (port: PortState) (vesselId: Guid) : Result<unit, PortError> =
+    let vesselIsNotDocked (port: PortState) (vesselId: Guid) : Result<unit, PortCommandErrors> =
         if port.DockedVessels.Contains(vesselId) then
             Error VesselAlreadyDocked
         else
             Ok()
 
-    let vesselIsDocked (port: PortState) (vesselId: Guid) : Result<unit, PortError> =
+    let vesselIsDocked (port: PortState) (vesselId: Guid) : Result<unit, PortCommandErrors> =
         if port.DockedVessels.Contains(vesselId) then
             Ok()
         else
-            Error VesselNotDocked
+            Error VesselNotDockedAtPort
 
-let decide (state: PortState option) (command: PortCommand) : Result<PortEvent list, PortError> =
+let decide
+    (state: PortState option)
+    (command: PortCommand)
+    : Result<PortEvent list, PortCommandErrors> =
     match command, state with
 
     // Register new port
@@ -205,7 +210,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
             ]
         }
 
-    | RegisterPort _, Some _ -> Error PortAlreadyExists
+    | RegisterPort _, Some _ -> Error PortAlreadyRegistered
 
     // Reserve docking
     | ReserveDocking cmd, Some port ->
@@ -226,7 +231,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
             ]
         }
 
-    | ReserveDocking _, None -> Error PortNotFound
+    | ReserveDocking _, None -> Error Shared.Api.Port.PortNotFound
 
     | ConfirmDocking cmd, Some port ->
         result {
@@ -241,7 +246,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
             ]
         }
 
-    | ConfirmDocking _, None -> Error PortNotFound
+    | ConfirmDocking _, None -> Error Shared.Api.Port.PortNotFound
 
     | ExpireReservation cmd, Some port ->
         result {
@@ -256,7 +261,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
             ]
         }
 
-    | ExpireReservation _, None -> Error PortNotFound
+    | ExpireReservation _, None -> Error Shared.Api.Port.PortNotFound
 
     | UndockVessel cmd, Some port ->
         result {
@@ -267,7 +272,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
             ]
         }
 
-    | UndockVessel _, None -> Error PortNotFound
+    | UndockVessel _, None -> Error Shared.Api.Port.PortNotFound
 
     | OpenPort cmd, Some port ->
         result {
@@ -277,7 +282,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
                 return [ PortOpened { OpenedAt = cmd.Metadata.Timestamp } ]
         }
 
-    | OpenPort _, None -> Error PortNotFound
+    | OpenPort _, None -> Error Shared.Api.Port.PortNotFound
 
     | ClosePort cmd, Some port ->
         result {
@@ -288,7 +293,7 @@ let decide (state: PortState option) (command: PortCommand) : Result<PortEvent l
                 return [ PortClosed { ClosedAt = cmd.Metadata.Timestamp } ]
         }
 
-    | ClosePort _, None -> Error PortNotFound
+    | ClosePort _, None -> Error Shared.Api.Port.PortNotFound
 
 let evolve (state: PortState option) (event: PortEvent) : PortState option =
     match event, state with

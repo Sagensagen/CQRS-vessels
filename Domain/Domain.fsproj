@@ -7,8 +7,6 @@
 
   <ItemGroup>
     <Compile Include="EventMetadata.fs" />
-    <Compile Include="VesselErrors.fs" />
-    <Compile Include="PortErrors.fs" />
     <Compile Include="VesselAggregate.fs" />
     <Compile Include="PortAggregate.fs" />
   </ItemGroup>

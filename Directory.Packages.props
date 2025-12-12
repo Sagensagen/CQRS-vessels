@@ -15,10 +15,6 @@
     <PackageVersion Include="Akka.Streams" Version="1.5.55" />
     <PackageVersion Include="Marten" Version="8.14.0" />
     <PackageVersion Include="Marten.AspNetCore" Version="8.14.0" />
-    <PackageVersion Include="NetTopologySuite" Version="2.6.0" />
-    <PackageVersion Include="NetTopologySuite.Features" Version="2.2.0" />
-    <PackageVersion Include="NetTopologySuite.IO" Version="1.14.0.1" />
-    <PackageVersion Include="NetTopologySuite.IO.Esri.Shapefile" Version="1.2.0" />
     <PackageVersion Include="Weasel.Postgresql" Version="8.2.0" />
     <PackageVersion Include="Npgsql" Version="9.0.2" />
     <PackageVersion Include="Npgsql.Json.NET" Version="9.0.2" />

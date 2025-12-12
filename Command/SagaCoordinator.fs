@@ -30,7 +30,7 @@ let createSagaCoordinator (documentStore: IDocumentStore) (mailbox: Actor<obj>) 
         (context: IActorContext)
         =
         let sagaId = Guid.NewGuid()
-        let sagaName = sprintf "docking-saga-%s" (sagaId.ToString())
+        let sagaName = ActorPaths.dockingSagaName sagaId
 
         logger.Information(
             "Creating docking saga {SagaId} for vessel {VesselId} at port {PortId}",

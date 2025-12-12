@@ -5,7 +5,6 @@ open Shared.Api.Shared
 open Shared.Api.Vessel
 open Domain.EventMetadata
 open FsToolkit.ErrorHandling
-open Domain.VesselErrors
 
 type VesselState = {
     Id: Guid
@@ -112,25 +111,25 @@ and VesselOperationalStatusUpdatedEvt = { Status: OperationalStatus; UpdatedAt: 
 and VesselDecommissionedEvt = { DecommissionedAt: DateTimeOffset }
 
 module private Validation =
-    let validateMmsi (mmsi: int) : Result<int, VesselError> =
+    let validateMmsi (mmsi: int) : Result<int, VesselCommandErrors> =
         if mmsi >= 100000000 && mmsi <= 999999999 then
             Ok mmsi
         else
             Error(ValidationError "MMSI must be a 9-digit number")
 
-    let validateImo (imo: int option) : Result<int option, VesselError> =
+    let validateImo (imo: int option) : Result<int option, VesselCommandErrors> =
         match imo with
         | Some i when i >= 1000000 && i <= 9999999 -> Ok imo
         | Some _ -> Error(ValidationError "IMO number must be 7 digits")
         | None -> Ok None
 
-    let validateCrewSize (size: int) : Result<int, VesselError> =
+    let validateCrewSize (size: int) : Result<int, VesselCommandErrors> =
         if size >= 0 && size <= 10000 then
             Ok size
         else
             Error(ValidationError "Crew size must be between 0 and 10000")
 
-    let validateName (name: string) : Result<string, VesselError> =
+    let validateName (name: string) : Result<string, VesselCommandErrors> =
         if String.IsNullOrWhiteSpace(name) then
             Error(ValidationError "Vessel name cannot be empty")
         elif name.Length > 200 then
@@ -138,7 +137,7 @@ module private Validation =
         else
             Ok name
 
-    let validatePosition (position: LatLong) : Result<LatLong, VesselError> =
+    let validatePosition (position: LatLong) : Result<LatLong, VesselCommandErrors> =
         if NavigationBounds.isWithinBounds position then
             Ok position
         else
@@ -147,14 +146,14 @@ module private Validation =
                     $"Position ({position.Latitude}, {position.Longitude}) is outside navigable network bounds (Lat: {NavigationBounds.MinLatitude} to {NavigationBounds.MaxLatitude}, Lon: {NavigationBounds.MinLongitude} to {NavigationBounds.MaxLongitude})"
             )
 
-    let canDepartFromPort (state: VesselState) : Result<unit, VesselError> =
+    let canDepartFromPort (state: VesselState) : Result<unit, VesselCommandErrors> =
         match state.State, state.CurrentPortId with
         | OperationalStatus.Docked _, Some _ -> Ok()
         | OperationalStatus.Docked _, None ->
             Error(InvalidStateTransition("docked with port ID", "docked without port ID"))
         | _ -> Error(InvalidStateTransition("docked", "at sea"))
 
-    let canArriveAtPort (state: VesselState) : Result<unit, VesselError> =
+    let canArriveAtPort (state: VesselState) : Result<unit, VesselCommandErrors> =
         match state.State with
         | OperationalStatus.AtSea -> Ok()
         | OperationalStatus.InRoute route ->
@@ -172,7 +171,7 @@ module private Validation =
 let decide
     (state: VesselState option)
     (command: VesselCommand)
-    : Result<VesselEvent list, VesselError> =
+    : Result<VesselEvent list, VesselCommandErrors> =
     match command, state with
 
     // Register new vessel
@@ -202,14 +201,14 @@ let decide
             ]
         }
 
-    | RegisterVessel _, Some _ -> Error VesselAlreadyExists
+    | RegisterVessel _, Some _ -> Error VesselIdAlreadyExists
 
     | UpdatePosition cmd, Some _ ->
         Ok [
             VesselPositionUpdated { Position = cmd.Position; UpdatedAt = cmd.Metadata.Timestamp }
         ]
 
-    | UpdatePosition _, None -> Error VesselNotFound
+    | UpdatePosition _, None -> Error Shared.Api.Vessel.VesselNotFound
 
     | ArriveAtPort cmd, Some vessel ->
         match Validation.canArriveAtPort vessel with // TODO check if in route and is at last route idx and the port is correct. Maybe just drop the portId in the command and rely on the routeInfo??
@@ -227,7 +226,7 @@ let decide
             ]
         | Error err -> Error err
 
-    | ArriveAtPort _, None -> Error VesselNotFound
+    | ArriveAtPort _, None -> Error Shared.Api.Vessel.VesselNotFound
 
     | DepartFromPort cmd, Some vessel ->
         result {
@@ -242,7 +241,7 @@ let decide
             ]
         }
 
-    | DepartFromPort _, None -> Error VesselNotFound
+    | DepartFromPort _, None -> Error Shared.Api.Vessel.VesselNotFound
 
     | UpdateOperationalStatus cmd, Some _ ->
         Ok [
@@ -252,7 +251,7 @@ let decide
             }
         ]
 
-    | UpdateOperationalStatus _, None -> Error VesselNotFound
+    | UpdateOperationalStatus _, None -> Error Shared.Api.Vessel.VesselNotFound
 
     | DecommissionVessel cmd, Some _ ->
         Ok [
@@ -263,7 +262,7 @@ let decide
             }
         ]
 
-    | DecommissionVessel _, None -> Error VesselNotFound
+    | DecommissionVessel _, None -> Error Shared.Api.Vessel.VesselNotFound
 
     | AdvanceRouteWaypoint cmd, Some vessel ->
         match vessel.State with
@@ -288,7 +287,7 @@ let decide
                 ]
         | _ -> Error NotInRoute
 
-    | AdvanceRouteWaypoint _, None -> Error VesselNotFound
+    | AdvanceRouteWaypoint _, None -> Error Shared.Api.Vessel.VesselNotFound
 
 let evolve (state: VesselState option) (event: VesselEvent) : VesselState option =
     match event, state with

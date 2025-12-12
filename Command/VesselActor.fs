@@ -5,12 +5,12 @@ open Akka.Actor
 open Akka.FSharp
 open Marten
 open Domain.VesselAggregate
-open Domain.VesselErrors
+open Shared.Api.Vessel
 open Serilog
 
 type VesselCommandResponse =
     | VesselCommandSuccess of eventCount: int
-    | VesselCommandFailure of error: VesselError
+    | VesselCommandFailure of error: VesselCommandErrors
 
 type VesselActorState = { State: VesselState option; Version: int64 }
 

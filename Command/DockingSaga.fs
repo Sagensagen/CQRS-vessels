@@ -66,13 +66,13 @@ let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (ma
         | None -> state
 
     let sendCommandToVessel (vesselId: Guid) (command: VesselCommand) (context: IActorContext) =
-        let vesselPath = sprintf "/user/vessel-%s" (vesselId.ToString())
+        let vesselPath = ActorPaths.vesselActorPath vesselId
         let vesselActor = context.ActorSelection(vesselPath)
         vesselActor.Tell(VesselActor.VesselActorMessage.ExecuteCommand(command), mailbox.Self)
         logger.Information("Sent command to vessel {VesselId}", vesselId)
 
     let sendCommandToPort (portId: Guid) (command: PortCommand) (context: IActorContext) =
-        let portPath = sprintf "/user/port-%s" (portId.ToString())
+        let portPath = ActorPaths.portActorPath portId
         let portActor = context.ActorSelection(portPath)
         portActor.Tell(PortActor.PortActorMessage.ExecuteCommand(command), mailbox.Self)
         logger.Information("Sent command to port {PortId}", portId)

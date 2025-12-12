@@ -77,10 +77,9 @@ let private Application () =
             getPortStatistics (fun stats -> UpdatePortStatistics (Some stats) |> setCtx) setCtx
             getVesselStatistics (fun stats -> UpdateVesselStatistics (Some stats) |> setCtx) setCtx
           ),
-          2000,
+          5000,
           []
         )
-
       {new System.IDisposable with
         member __.Dispose () =
           Browser.Dom.window.clearInterval pollTimer

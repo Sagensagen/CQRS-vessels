@@ -91,6 +91,13 @@ type VesselCommandErrors =
     | InvalidVesselState of expected: string * actual: string
     | CargoNotFound
     | PortNotFound
+    | NoActiveRoute
+    | NotInRoute
+    | NoMoreWaypoints
+    | RouteCalculationFailed of message: string
+    | ValidationError of message: string
+    | PersistenceError of message: string
+    | InvalidStateTransition of string * string
 
 type VesselQueryErrors = | VesselNotFound
 

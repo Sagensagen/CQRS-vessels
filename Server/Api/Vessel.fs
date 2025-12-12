@@ -2,13 +2,11 @@ module Api.Vessel
 
 open System
 open FsToolkit.ErrorHandling
-open Giraffe.ComputationExpressions
 open Microsoft.AspNetCore.Http
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Giraffe
 open Marten
-open Shared.Api.Shared
 open Shared.Api.Vessel
 open CommandGateway
 open Query.QueryHandlers
@@ -103,28 +101,11 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
 
                     if waypoints.Length = 0 then
                         return! Error VesselCommandErrors.CargoNotFound
-                    // Remove consecutive duplicate waypoints
-                    let deduplicatedWaypoints =
-                        waypoints
-                        |> Array.fold
-                            (fun acc waypoint ->
-                                match acc with
-                                | [] -> [ waypoint ]
-                                | head :: _ when
-                                    head.Latitude = waypoint.Latitude && head.Longitude = waypoint.Longitude
-                                    ->
-                                    acc // Skip duplicate
-                                | _ -> waypoint :: acc)
-                            []
-                        |> List.rev
-                        |> List.toArray
 
                     return!
                         commandGateway.UpdateOperationalStatus(
                             vesselId,
-                            OperationalStatus.InRoute
-                                { route with
-                                    Waypoints = deduplicatedWaypoints },
+                            OperationalStatus.InRoute { route with Waypoints = waypoints },
                             Some "API.Anchor"
                         )
 

@@ -6,14 +6,14 @@ open Akka.FSharp
 open Marten
 open Domain.EventMetadata
 open Domain.PortAggregate
-open Domain.PortErrors
+open Shared.Api.Port
 open Serilog
 
 type PortActorState = { State: PortState option; Version: int64 }
 
 type PortCommandResponse =
     | PortCommandSuccess of eventCount: int
-    | PortCommandFailure of error: PortError
+    | PortCommandFailure of error: PortCommandErrors
 
 type PortActorMessage =
     | ExecuteCommand of command: PortCommand

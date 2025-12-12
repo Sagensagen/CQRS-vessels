@@ -48,6 +48,10 @@ type PortCommandErrors =
     | ReservationNotFound
     | InvalidPortState of expected: string * actual: string
     | CommandFailed of message: string // Generic message
+    | VesselAlreadyDocked
+    | ReservationAlreadyExists
+    | ValidationError of message: string
+    | PersistenceError of message: string
 
 type PortQueryErrors =
     | PortNotFound
