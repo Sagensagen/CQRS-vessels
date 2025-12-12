@@ -12,7 +12,7 @@ A vessel and port management system demonstrating CQRS with Event Sourcing for l
 
 ## Tech
 - MartenDB for ES wrapper with PostgreSQL
-- PostGIS + PGRouting
+- PostGIS + PGRouting for shortest path between two coordinates
 - AKKA.net actors
 - Giraffe
 - Fable+ReactJS
