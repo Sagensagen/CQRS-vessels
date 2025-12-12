@@ -29,9 +29,9 @@ rec {
     nativeBuildInputs = [
       dotnet-sdk
       pkgs.bun
-      pkgs.openfga-cli
       pkgs.npins
       pkgs.postgresql16Packages.pgrouting
+      pkgs.gdal
     ];
     DOTNET_ROOT = dotnet-sdk;
     DOTNET_CLI_TELEMETRY_OPTOUT = "true";
