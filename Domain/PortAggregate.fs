@@ -183,6 +183,13 @@ module private Validation =
         else
             Error VesselNotDockedAtPort
 
+/// <summary>
+/// Validates the incoming command with the port state given. Returns a list of events that shall
+/// be created from this command if validation is passed
+/// </summary>
+/// <param name="state">Current port state</param>
+/// <param name="command">Command to process</param>
+/// <returns>List of events to apply, or validation error</returns>
 let decide
     (state: PortState option)
     (command: PortCommand)
