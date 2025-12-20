@@ -71,7 +71,7 @@ CREATE EXTENSION pgrouting;
 
 Populate the dataset. Need Gdal for this
 ```bash
-ogr2ogr -f "PostgreSQL" \                                                           on 
+ogr2ogr -f "PostgreSQL" \
         PG:"host=localhost user=postgres dbname=postgres password=postgres port=5433" \
         ./Command/Route/25.geojson \
         -nln ship_routes \
@@ -86,6 +86,12 @@ Alter the columns for readability / QX(query experience)
 ALTER TABLE ship_routes RENAME COLUMN "length0" TO "cost";
 ALTER TABLE ship_routes RENAME COLUMN "from node0" TO source;
 ALTER TABLE ship_routes RENAME COLUMN "to node0" TO target;
+```
+
+```sql
+  ALTER TABLE ship_routes
+  ALTER COLUMN source TYPE integer USING source::integer,
+  ALTER COLUMN target TYPE integer USING target::integer;
 ```
 
 #### Other
