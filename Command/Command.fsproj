@@ -11,7 +11,6 @@
     <Compile Include="VesselActor.fs" />
     <Compile Include="PortActor.fs" />
     <Compile Include="DockingSaga.fs" />
-    <Compile Include="SagaCoordinator.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -28,6 +28,7 @@ type DockingSagaState = {
     CurrentStep: DockingSagaStep
     StartedAt: DateTimeOffset
     Metadata: EventMetadata
+    OriginalSender: IActorRef option
 }
 
 type DockingSagaMessage =
@@ -40,6 +41,11 @@ type DockingSagaMessage =
     | ReservationTimeout
     | GetSagaState of replyTo: IActorRef
 
+/// Response messages sent back to the original caller
+type DockingSagaResponse =
+    | DockingSagaCompleted of sagaId: Guid
+    | DockingSagaFailed of sagaId: Guid * error: string
+
 type DockingSagaStateResponse =
     | SagaState of DockingSagaState
     | SagaNotStarted
@@ -49,7 +55,7 @@ type DockingSagaStateResponse =
 /// There are potential cases for race conditions if multiple vessels try to dock the same port,
 /// and reservations with ACKS and confirmations make this more safe.
 /// </summary>
-let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (mailbox: Actor<obj>) =
+let private createDockingSaga (sagaId: Guid) (mailbox: Actor<obj>) =
     let logger = Log.ForContext("SagaId", sagaId)
 
     let updateState
@@ -198,6 +204,7 @@ let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (ma
                 ->
                 match msg with
                 | StartDocking(vesselId, portId, metadata) ->
+                    let originalSender = mailbox.Sender()
                     let newState = {
                         SagaId = sagaId
                         VesselId = vesselId
@@ -206,6 +213,7 @@ let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (ma
                         CurrentStep = Initial
                         StartedAt = DateTimeOffset.UtcNow
                         Metadata = metadata
+                        OriginalSender = Some originalSender
                     }
 
                     return! requestReservation newState context
@@ -229,9 +237,17 @@ let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (ma
                     )
                     return Some s
 
-            | :? DockingSagaMessage as (GetSagaState replyTo), None ->
-                replyTo <! SagaNotStarted
-                return None
+            | :? DockingSagaMessage as msg, None ->
+                match msg with
+                | GetSagaState replyTo ->
+                    replyTo <! SagaNotStarted
+                    return None
+                | _ ->
+                    logger.Warning(
+                        "Unhandled DockingSagaMessage when state is None: {Message}",
+                        msg
+                    )
+                    return None
 
             // PortCommandResponse types
             | :? PortActor.PortCommandResponse as response, Some s ->
@@ -293,16 +309,33 @@ let private createDockingSaga (sagaId: Guid) (documentStore: IDocumentStore) (ma
             let newState = handleMessage message state context |> Async.RunSynchronously
             match newState with
             | Some s when s.CurrentStep.IsCompleted ->
-                logger.Error "Killing saga - Complete"
+                logger.Information
+                    "Saga completed successfully - notifying caller and stopping actor"
+                // Notify original sender of completion
+                match s.OriginalSender with
+                | Some sender -> sender <! DockingSagaResponse.DockingSagaCompleted s.SagaId
+                | None -> logger.Warning "No original sender to notify of completion"
                 context.Stop(mailbox.Self)
+                return ()
             | Some s when s.CurrentStep.IsFailed ->
-                logger.Error "Killing saga -  Faillure"
+                let reason =
+                    match s.CurrentStep with
+                    | Failed r -> r
+                    | _ -> "Unknown"
+                logger.Warning(
+                    "Saga failed: {Reason} - notifying caller and stopping actor",
+                    reason
+                )
+                // Notify original sender of failure
+                match s.OriginalSender with
+                | Some sender -> sender <! DockingSagaResponse.DockingSagaFailed(s.SagaId, reason)
+                | None -> logger.Warning "No original sender to notify of failure"
                 context.Stop(mailbox.Self)
+                return ()
             | _ -> return! loop newState
         }
 
     logger.Information("Starting docking saga {SagaId} (in-memory)", sagaId)
     loop None
 
-let props (sagaId: Guid) (documentStore: IDocumentStore) =
-    Props.Create(fun () -> FunActor(createDockingSaga sagaId documentStore))
+let props (sagaId: Guid) = Props.Create(fun () -> FunActor(createDockingSaga sagaId))

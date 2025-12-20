@@ -97,7 +97,9 @@ let private vesselApi (ctx: HttpContext) : IVesselApi =
 
                 | StartRoute route ->
                     // Try calculate shortest path
-                    let! waypoints = Command.Route.AStar.aStar route.StartCoordinates route.DestinationCoordinates
+                    let! waypoints =
+                        Command.Route.AStar.aStar route.StartCoordinates route.DestinationCoordinates
+                        |> AsyncResult.defaultWith (fun _ -> [||])
 
                     if waypoints.Length = 0 then
                         return! Error VesselCommandErrors.CargoNotFound
