@@ -11,9 +11,11 @@
     <Compile Include="MartenFixture.fs" />
     <Compile Include="VesselActorIntegrationTests.fs" />
     <Compile Include="PortActorIntegrationTests.fs" />
+    <Compile Include="DockingSagaTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Akka.Logger.Serilog" />
     <PackageReference Include="FSharp.SystemTextJson" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Testcontainers.PostgreSql" />
