@@ -34,15 +34,20 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         with _ ->
             actorSystem.ActorOf(PortActor.props portId documentStore, actorName)
 
-    let getSagaCoordinator () =
-        let actorName = ActorPaths.SagaCoordinatorName
-        let actorPath = actorSystem.ActorSelection(ActorPaths.sagaCoordinatorPath)
+    let createDockingSaga (vesselId: Guid) (portId: Guid) (metadata: Domain.EventMetadata.EventMetadata) =
+        let sagaId = Guid.NewGuid()
+        let sagaName = ActorPaths.dockingSagaName sagaId
 
-        // Try resolve or create the saga-coordinator
-        try
-            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result
-        with _ ->
-            actorSystem.ActorOf(SagaCoordinator.props documentStore, actorName)
+        logger.Information(
+            "Creating docking saga {SagaId} for vessel {VesselId} at port {PortId}",
+            sagaId,
+            vesselId,
+            portId
+        )
+
+        let sagaActor = actorSystem.ActorOf(DockingSaga.props sagaId, sagaName)
+
+        (sagaId, sagaActor)
 
     member _.SendVesselCommand
         (vesselId: Guid, command: VesselCommand)
@@ -380,14 +385,29 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                                 )
 
                                 let metadata = Domain.EventMetadata.createInitialMetadata actor
-                                let sagaCoordinator = getSagaCoordinator ()
+                                let (sagaId, sagaActor) = createDockingSaga vesselId portId metadata
 
-                                let message =
-                                    SagaCoordinator.SagaCoordinatorMessage.StartDockingSaga(vesselId, portId, metadata)
+                                let startMessage =
+                                    DockingSaga.DockingSagaMessage.StartDocking(vesselId, portId, metadata)
 
-                                let! sagaId = sagaCoordinator.Ask<Guid>(message, commandTimeout)
-                                logger.Information("Docking saga {SagaId} started successfully", sagaId)
-                                return! Ok sagaId
+                                let! response =
+                                    sagaActor.Ask<DockingSaga.DockingSagaResponse>(startMessage, commandTimeout)
+                                    |> Async.AwaitTask
+
+                                match response with
+                                | DockingSaga.DockingSagaResponse.DockingSagaCompleted completedSagaId ->
+                                    logger.Information("Docking saga {SagaId} completed successfully", completedSagaId)
+                                    return! Ok completedSagaId
+                                | DockingSaga.DockingSagaResponse.DockingSagaFailed(failedSagaId, error) ->
+                                    logger.Warning("Docking saga {SagaId} failed: {Error}", failedSagaId, error)
+
+                                    return!
+                                        Error(
+                                            Shared.Api.Vessel.VesselCommandErrors.InvalidVesselState(
+                                                "saga completion",
+                                                error
+                                            )
+                                        )
 
                     | _ ->
                         logger.Warning(
