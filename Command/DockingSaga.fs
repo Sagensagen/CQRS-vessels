@@ -124,8 +124,7 @@ let createDockingSaga (sagaId: Guid) (ctx: Actor<DockingSagaProtocol>) =
                         Metadata = metadata
                     }
 
-                sendCommandToPort state.PortId expireCmd context
-                ()
+                sendCommandToPort state.PortId expireCmd context |> ignore
 
             return updateState (Some state) (Failed reason) None
         }

@@ -35,7 +35,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         with _ ->
             PortActor.spawn actorSystem actorName portId documentStore
 
-    let createDockingSaga (vesselId: Guid) (portId: Guid) (metadata: Domain.EventMetadata.EventMetadata) =
+    let createDockingSaga (vesselId: Guid) (portId: Guid) =
         let sagaId = Guid.NewGuid()
         let sagaName = ActorPaths.dockingSagaName sagaId
 
@@ -292,8 +292,6 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             return portId
         }
 
-
-
     member _.StartDockingSaga
         (vesselId: Guid, actor: string option)
         : Async<Result<Guid, Shared.Api.Vessel.VesselCommandErrors>> =
@@ -381,8 +379,9 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                                     portState.Name
                                 )
 
+                                let sagaId, sagaActor = createDockingSaga vesselId portId
+
                                 let metadata = Domain.EventMetadata.createInitialMetadata actor
-                                let (sagaId, sagaActor) = createDockingSaga vesselId portId metadata
 
                                 let startMessage =
                                     DockingSaga.DockingSagaProtocol.StartDocking(vesselId, portId, metadata)
