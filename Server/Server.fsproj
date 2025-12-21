@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <PackageReference Include="Akka.Hosting"  />
+    <PackageReference Include="Akkling.Persistence" />
     <PackageReference Include="Fable.Remoting.Giraffe"  />
     <PackageReference Include="FSharp.SystemTextJson"  />
     <PackageReference Include="FsToolkit.ErrorHandling"  />

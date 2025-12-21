@@ -3,6 +3,7 @@ module CommandGateway
 open System
 open System.Threading.Tasks
 open Akka.Actor
+open Akkling
 open Command
 open FsToolkit.ErrorHandling
 open Marten
@@ -16,23 +17,23 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
     let logger = Log.ForContext<CommandGateway>()
     let commandTimeout = TimeSpan.FromSeconds 30.0
 
-    let getOrCreateVesselActor (vesselId: Guid) =
+    let getOrCreateVesselActor (vesselId: Guid) : IActorRef<VesselActor.VesselProtocol> =
         let actorName = ActorPaths.vesselActorName vesselId
         let actorPath = actorSystem.ActorSelection(ActorPaths.vesselActorPath vesselId)
 
         try
-            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result
+            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
         with _ ->
-            actorSystem.ActorOf(VesselActor.props vesselId documentStore, actorName)
+            VesselActor.spawn actorSystem actorName vesselId documentStore
 
-    let getOrCreatePortActor (portId: Guid) =
+    let getOrCreatePortActor (portId: Guid) : IActorRef<PortActor.PortProtocol> =
         let actorName = ActorPaths.portActorName portId
         let actorPath = actorSystem.ActorSelection(ActorPaths.portActorPath portId)
 
         try
-            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result
+            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
         with _ ->
-            actorSystem.ActorOf(PortActor.props portId documentStore, actorName)
+            PortActor.spawn actorSystem actorName portId documentStore
 
     let createDockingSaga (vesselId: Guid) (portId: Guid) (metadata: Domain.EventMetadata.EventMetadata) =
         let sagaId = Guid.NewGuid()
@@ -45,7 +46,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             portId
         )
 
-        let sagaActor = actorSystem.ActorOf(DockingSaga.props sagaId, sagaName)
+        let sagaActor = DockingSaga.spawn actorSystem sagaName sagaId
 
         (sagaId, sagaActor)
 
@@ -60,11 +61,9 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                 logger.Information("Sending vessel command to {VesselId}: {Command}", vesselId, commandName)
 
                 let vesselActor = getOrCreateVesselActor vesselId
-                let message = VesselActor.VesselActorMessage.ExecuteCommand(command)
+                let message = VesselActor.VesselProtocol.ExecuteCommand(command)
 
-                let! response =
-                    vesselActor.Ask<VesselActor.VesselCommandResponse>(message, commandTimeout)
-                    |> Async.AwaitTask
+                let! response = vesselActor.Ask<VesselActor.VesselCommandResponse>(message, Some commandTimeout) //|> Async.AwaitTask
 
                 match response with
                 | VesselActor.VesselCommandSuccess eventCount ->
@@ -202,11 +201,9 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         asyncResult {
             try
                 let portActor = getOrCreatePortActor portId
-                let message = PortActor.PortActorMessage.ExecuteCommand(command)
+                let message = PortActor.PortProtocol.ExecuteCommand(command)
 
-                let! response =
-                    portActor.Ask<PortActor.PortCommandResponse>(message, commandTimeout)
-                    |> Async.AwaitTask
+                let! response = portActor.Ask<PortActor.PortCommandResponse>(message, Some commandTimeout)
 
                 match response with
                 | PortActor.PortCommandSuccess eventCount ->
@@ -309,8 +306,8 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                 // First, get vessel state to extract destination port from route
                 let! vesselStateResponse =
                     vesselActor.Ask<VesselActor.VesselStateResponse>(
-                        VesselActor.VesselActorMessage.GetState,
-                        commandTimeout
+                        VesselActor.VesselProtocol.GetState,
+                        Some commandTimeout
                     )
 
                 match vesselStateResponse with
@@ -345,8 +342,8 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
 
                         let! portStateResponse =
                             portActor.Ask<PortActor.PortStateResponse>(
-                                PortActor.PortActorMessage.GetState,
-                                commandTimeout
+                                PortActor.PortProtocol.GetState,
+                                Some commandTimeout
                             )
 
                         match portStateResponse with
@@ -388,11 +385,10 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                                 let (sagaId, sagaActor) = createDockingSaga vesselId portId metadata
 
                                 let startMessage =
-                                    DockingSaga.DockingSagaMessage.StartDocking(vesselId, portId, metadata)
+                                    DockingSaga.DockingSagaProtocol.StartDocking(vesselId, portId, metadata)
 
                                 let! response =
-                                    sagaActor.Ask<DockingSaga.DockingSagaResponse>(startMessage, commandTimeout)
-                                    |> Async.AwaitTask
+                                    sagaActor.Ask<DockingSaga.DockingSagaResponse>(startMessage, Some commandTimeout)
 
                                 match response with
                                 | DockingSaga.DockingSagaResponse.DockingSagaCompleted completedSagaId ->
@@ -448,12 +444,14 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
             let portActor = getOrCreatePortActor portId
 
             let! vesselState =
-                vesselActor.Ask<VesselActor.VesselStateResponse>(VesselActor.GetState, commandTimeout)
-                |> Async.AwaitTask
+                vesselActor.Ask<VesselActor.VesselStateResponse>(
+                    VesselActor.VesselProtocol.GetState,
+                    Some commandTimeout
+                )
+            //|> Async.AwaitTask
 
             let! portState =
-                portActor.Ask<PortActor.PortStateResponse>(PortActor.GetState, commandTimeout)
-                |> Async.AwaitTask
+                portActor.Ask<PortActor.PortStateResponse>(PortActor.PortProtocol.GetState, Some commandTimeout)
 
             match vesselState, portState with
             | VesselActor.VesselExists v, PortActor.PortExists p ->

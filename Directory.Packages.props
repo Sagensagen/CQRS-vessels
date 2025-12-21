@@ -5,12 +5,13 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Akka.Logger.Serilog" Version="1.5.25" />
+    <PackageVersion Include="Akkling" Version="0.17.0" />
+    <PackageVersion Include="Akkling.Persistence" Version="0.17.0" />
     <PackageVersion Include="Expecto" Version="10.2.3" />
     <PackageVersion Include="FSharp.Core" Version="10.0.100" />
     <PackageVersion Include="FSharp.SystemTextJson" Version="1.4.36" />
     <PackageVersion Include="Akka" Version="1.5.56" />
     <PackageVersion Include="Akka.DependencyInjection" Version="1.5.55" />
-    <PackageVersion Include="Akka.FSharp" Version="1.5.56" />
     <PackageVersion Include="Akka.Hosting" Version="1.5.55.1" />
     <PackageVersion Include="Akka.Persistence" Version="1.5.55" />
     <PackageVersion Include="Akka.Persistence.Query" Version="1.5.55" />

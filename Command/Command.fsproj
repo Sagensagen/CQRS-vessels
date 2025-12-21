@@ -12,7 +12,6 @@
     <Compile Include="PortActor.fs" />
     <Compile Include="DockingSaga.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Domain\Domain.fsproj" />
     <ProjectReference Include="..\Shared\Shared.fsproj" />
@@ -20,7 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Akka.Hosting" />
-    <PackageReference Include="Akka.FSharp" />
+    <PackageReference Include="Akkling.Persistence" />
     <PackageReference Include="Marten"  />
     <PackageReference Update="FSharp.Core"  />
     <PackageReference Include="Serilog"  />
