@@ -77,7 +77,7 @@ let private Application () =
             getPortStatistics (fun stats -> UpdatePortStatistics (Some stats) |> setCtx) setCtx
             getVesselStatistics (fun stats -> UpdateVesselStatistics (Some stats) |> setCtx) setCtx
           ),
-          5000,
+          1000,
           []
         )
       {new System.IDisposable with

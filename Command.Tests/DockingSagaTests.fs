@@ -110,15 +110,19 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
               Metadata = Domain.EventMetadata.createInitialMetadata (Some "SagaTest") }
 
         vesselActor.Tell(
-            Command.VesselActor.VesselProtocol.ExecuteCommand(Domain.VesselAggregate.VesselCommand.UpdateOperationalStatus statusCmd),
+            Command.VesselActor.VesselProtocol.ExecuteCommand(
+                Domain.VesselAggregate.VesselCommand.UpdateOperationalStatus statusCmd
+            ),
             this.TestActor
         )
 
-        let result = this.ExpectMsg<Command.VesselActor.VesselCommandResponse>(TimeSpan.FromSeconds(5.0))
+        let result =
+            this.ExpectMsg<Command.VesselActor.VesselCommandResponse>(TimeSpan.FromSeconds(5.0))
 
         match result with
         | Command.VesselActor.VesselCommandResponse.VesselCommandSuccess _ -> ()
-        | Command.VesselActor.VesselCommandResponse.VesselCommandFailure err -> failwith $"Failed to set vessel in route: {err}"
+        | Command.VesselActor.VesselCommandResponse.VesselCommandFailure err ->
+            failwith $"Failed to set vessel in route: {err}"
 
     /// <summary>
     /// Helper to verify saga reached expected state within timeout
@@ -143,10 +147,11 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
     /// Helper to verify vessel is in expected operational state
     /// </summary>
     member private this.VerifyVesselState
-        (vesselActor: Akkling.ActorRefs.IActorRef<Command.VesselActor.VesselProtocol>, expectedStatus: OperationalStatus)
-        =
+        (vesselActor: Akkling.ActorRefs.IActorRef<Command.VesselActor.VesselProtocol>, expectedStatus: OperationalStatus) =
         vesselActor.Tell(Command.VesselActor.VesselProtocol.GetState, this.TestActor)
-        let response = this.ExpectMsg<Command.VesselActor.VesselStateResponse>(TimeSpan.FromSeconds(5.0))
+
+        let response =
+            this.ExpectMsg<Command.VesselActor.VesselStateResponse>(TimeSpan.FromSeconds(5.0))
 
         match response with
         | Command.VesselActor.VesselStateResponse.VesselExists state -> Assert.Equal(expectedStatus, state.State)
