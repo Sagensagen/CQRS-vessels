@@ -21,7 +21,7 @@ type PortActorIntegrationTests(fixture: MartenFixture) =
         use store = fixture.CreateStore()
         let portId = Guid.NewGuid()
 
-        let portActor = this.Sys.ActorOf(props portId store, $"port-{portId}")
+        let portActor = Command.PortActor.spawn this.Sys $"port-{portId}" portId store
 
         let cmd =
             { Id = portId
@@ -71,7 +71,8 @@ type PortActorIntegrationTests(fixture: MartenFixture) =
         let vesselId = Guid.NewGuid()
         let reservationId = Guid.NewGuid()
 
-        let portActor = this.Sys.ActorOf(props portId store, $"port-reserve-{portId}")
+        let portActor =
+            Command.PortActor.spawn this.Sys $"port-reserve-{portId}" portId store
 
         let registerCmd =
             { Id = portId
@@ -125,7 +126,8 @@ type PortActorIntegrationTests(fixture: MartenFixture) =
         let vesselId = Guid.NewGuid()
         let reservationId = Guid.NewGuid()
 
-        let portActor = this.Sys.ActorOf(props portId store, $"port-lifecycle-{portId}")
+        let portActor =
+            Command.PortActor.spawn this.Sys $"port-lifecycle-{portId}" portId store
 
         let registerCmd =
             { Id = portId
@@ -218,7 +220,8 @@ type PortActorIntegrationTests(fixture: MartenFixture) =
         use store = fixture.CreateStore()
         let portId = Guid.NewGuid()
 
-        let portActor = this.Sys.ActorOf(props portId store, $"port-capacity-{portId}")
+        let portActor =
+            Command.PortActor.spawn this.Sys $"port-capacity-{portId}" portId store
 
         // Register port with only 1 dock
         let registerCmd =
@@ -269,7 +272,9 @@ type PortActorIntegrationTests(fixture: MartenFixture) =
         // Arrange
         use store = fixture.CreateStore()
         let portId = Guid.NewGuid()
-        let portActor = this.Sys.ActorOf(props portId store, $"port-invalid-{portId}")
+
+        let portActor =
+            Command.PortActor.spawn this.Sys $"port-invalid-{portId}" portId store
 
         let cmd =
             { Id = portId

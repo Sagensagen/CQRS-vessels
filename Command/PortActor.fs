@@ -2,7 +2,8 @@ module Command.PortActor
 
 open System
 open Akka.Actor
-open Akka.FSharp
+open Akkling
+open Akkling.Actors
 open Marten
 open Domain.EventMetadata
 open Domain.PortAggregate
@@ -15,14 +16,15 @@ type PortCommandResponse =
     | PortCommandSuccess of eventCount: int
     | PortCommandFailure of error: PortCommandErrors
 
-type PortActorMessage =
-    | ExecuteCommand of command: PortCommand
-    | GetState
-    | CheckExpiredReservations
-
 type PortStateResponse =
     | PortExists of state: PortState
     | PortNotFound
+
+// Typed protocol for Akkling
+type PortProtocol =
+    | ExecuteCommand of PortCommand
+    | GetState
+    | CheckExpiredReservations
 
 let private unwrapPortEvent (event: PortEvent) : obj =
     match event with
@@ -106,7 +108,7 @@ let private recoverState (store: IDocumentStore) (portId: Guid) =
 let private handleCommand
     (store: IDocumentStore)
     (portId: Guid)
-    (sender: IActorRef)
+    sender
     (command: PortCommand)
     (state: PortActorState)
     =
@@ -138,7 +140,7 @@ let private handleCommand
     }
 
 /// Check for expired reservations and send expiration commands
-let private checkExpiredReservations (portId: Guid) (selfRef: IActorRef) (state: PortActorState) =
+let private checkExpiredReservations (portId: Guid) selfRef (state: PortActorState) =
     async {
         match state.State with
         | Some portState ->
@@ -176,38 +178,32 @@ let private checkExpiredReservations (portId: Guid) (selfRef: IActorRef) (state:
         | None -> return state
     }
 
-let createPortActor (portId: Guid) (documentStore: IDocumentStore) (mailbox: Actor<obj>) =
+let createPortActor (portId: Guid) (documentStore: IDocumentStore) (ctx: Actor<PortProtocol>) =
     let logger = Log.ForContext("PortId", portId)
 
     let rec loop (state: PortActorState) =
         actor {
-            let! message = mailbox.Receive()
+            let! message = ctx.Receive()
 
             match message with
-            | :? PortActorMessage as msg ->
-                match msg with
-                | ExecuteCommand command ->
-                    let newState =
-                        let sender = mailbox.Sender()
-                        handleCommand documentStore portId sender command state
-                        |> Async.RunSynchronously
-                    return! loop newState
+            | ExecuteCommand command ->
+                let newState =
+                    let sender = ctx.Sender()
+                    handleCommand documentStore portId sender command state
+                    |> Async.RunSynchronously
+                return! loop newState
 
-                | GetState ->
-                    let sender = mailbox.Sender()
-                    match state.State with
-                    | Some s -> sender <! PortExists s
-                    | None -> sender <! PortNotFound
-                    return! loop state
-
-                | CheckExpiredReservations ->
-                    let newState =
-                        checkExpiredReservations portId mailbox.Self state |> Async.RunSynchronously
-                    return! loop newState
-
-            | _ ->
-                logger.Warning("Unknown message type: {MessageType}", message.GetType().Name)
+            | GetState ->
+                let sender = ctx.Sender()
+                match state.State with
+                | Some s -> sender <! PortExists s
+                | None -> sender <! PortNotFound
                 return! loop state
+
+            | CheckExpiredReservations ->
+                let newState =
+                    checkExpiredReservations portId ctx.Self state |> Async.RunSynchronously
+                return! loop newState
         }
 
     // Recovery is synchronous to ensure actor starts in valid state
@@ -226,15 +222,21 @@ let createPortActor (portId: Guid) (documentStore: IDocumentStore) (mailbox: Act
     | None -> logger.Information("Port {PortId} ready (new)", portId)
 
     // Schedule periodic reservation expiry checks
-    mailbox.Context.System.Scheduler.ScheduleTellRepeatedly(
+    ctx.System.Scheduler.ScheduleTellRepeatedly(
         TimeSpan.FromSeconds 30.,
         TimeSpan.FromMinutes 1.,
-        mailbox.Self,
+        untyped ctx.Self, // Need to untype this for not-akkling api to understand..
         CheckExpiredReservations,
         ActorRefs.NoSender
     )
 
     loop recoveredState
 
-let props (portId: Guid) (documentStore: IDocumentStore) =
-    Props.Create(fun () -> FunActor(createPortActor portId documentStore))
+/// Spawn function to create a typed PortActor
+let spawn
+    (system: Akka.Actor.ActorSystem)
+    (name: string)
+    (portId: Guid)
+    (documentStore: IDocumentStore)
+    : IActorRef<PortProtocol> =
+    Akkling.Spawn.spawn system name (props (createPortActor portId documentStore))

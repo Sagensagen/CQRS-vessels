@@ -1,8 +1,7 @@
 module Command.VesselActor
 
 open System
-open Akka.Actor
-open Akka.FSharp
+open Akkling
 open Marten
 open Domain.VesselAggregate
 open Shared.Api.Vessel
@@ -15,13 +14,14 @@ type VesselCommandResponse =
 
 type VesselActorState = { State: VesselState option; Version: int64 } // Needed for snapshots later
 
-type VesselActorMessage =
-    | ExecuteCommand of command: VesselCommand
-    | GetState
-
 type VesselStateResponse =
     | VesselExists of state: VesselState
     | VesselNotFound
+
+// Typed protocol for Akkling
+type VesselProtocol =
+    | ExecuteCommand of VesselCommand
+    | GetState
 
 let private unwrapVesselEvent (event: VesselEvent) : obj =
     match event with
@@ -103,7 +103,7 @@ let private recoverState (store: IDocumentStore) (vesselId: Guid) =
 let private handleCommand
     (store: IDocumentStore)
     (vesselId: Guid)
-    (sender: IActorRef)
+    (sender)
     (command: VesselCommand)
     (state: VesselActorState)
     =
@@ -133,36 +133,30 @@ let private handleCommand
             return state
     }
 
-let private createVesselActor
+let createVesselActor
     (vesselId: Guid)
     (documentStore: IDocumentStore)
-    (mailbox: Actor<obj>)
+    (ctx: Actor<VesselProtocol>)
     =
     let logger = Log.ForContext("VesselId", vesselId)
 
     let rec loop (state: VesselActorState) =
         actor {
-            let! message = mailbox.Receive()
+            let! message = ctx.Receive()
 
             match message with
-            | :? VesselActorMessage as msg ->
-                match msg with
-                | ExecuteCommand command ->
-                    let sender = mailbox.Sender()
-                    let newState =
-                        handleCommand documentStore vesselId sender command state
-                        |> Async.RunSynchronously
-                    return! loop newState
+            | ExecuteCommand command ->
+                let sender = ctx.Sender()
+                let newState =
+                    handleCommand documentStore vesselId sender command state
+                    |> Async.RunSynchronously
+                return! loop newState
 
-                | GetState ->
-                    let sender = mailbox.Sender()
-                    match state.State with
-                    | Some s -> sender <! VesselExists s
-                    | None -> sender <! VesselNotFound
-                    return! loop state
-
-            | _ ->
-                logger.Warning("Unknown message type: {MessageType}", message.GetType().Name)
+            | GetState ->
+                let sender = ctx.Sender()
+                match state.State with
+                | Some s -> sender <! VesselExists s
+                | None -> sender <! VesselNotFound
                 return! loop state
         }
 
@@ -182,14 +176,11 @@ let private createVesselActor
 
     loop recoveredState
 
-/// <summary>
-/// Used in the creation of a new vesselActor
-/// </summary>
-/// <example>
-/// <code>
-/// let actorName = sprintf "vessel-%s" (vesselId.ToString())
-/// let vesselActor = actorSystem.ActorOf(VesselActor.props vesselId documentStore, actorName)
-/// </code>
-/// </example>
-let props (vesselId: Guid) (documentStore: IDocumentStore) =
-    Props.Create(fun () -> FunActor(createVesselActor vesselId documentStore))
+/// Spawn function to create a typed VesselActor
+let spawn
+    (system: Akka.Actor.ActorSystem)
+    (name: string)
+    (vesselId: Guid)
+    (documentStore: IDocumentStore)
+    : IActorRef<VesselProtocol> =
+    Akkling.Spawn.spawn system name (props (createVesselActor vesselId documentStore))

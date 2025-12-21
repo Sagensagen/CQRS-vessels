@@ -4,7 +4,6 @@ open System
 open Akka.Actor
 open Xunit
 open Akka.TestKit.Xunit2
-open Command.VesselActor
 open Command.Tests.MartenFixture
 open Shared.Api.Vessel
 open Shared.Api.Shared
@@ -19,7 +18,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
     member private this.CreateDockingSaga(store) =
         let sagaId = Guid.NewGuid()
         let sagaName = ActorPaths.dockingSagaName sagaId
-        let sagaActor = this.Sys.ActorOf(Command.DockingSaga.props sagaId, sagaName)
+        let sagaActor = Command.DockingSaga.spawn this.Sys sagaName sagaId
         (sagaId, sagaActor)
 
     /// <summary>
@@ -30,9 +29,9 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
         let vesselPosition = { Latitude = 59.0; Longitude = 10.0 }
 
         let vesselActor =
-            this.Sys.ActorOf(Command.VesselActor.props vesselId store, $"vessel-{vesselId}")
+            Command.VesselActor.spawn this.Sys $"vessel-{vesselId}" vesselId store
 
-        let registerCmd: Domain.VesselAggregate.RegisterVesselCmd =
+        let cmd: Domain.VesselAggregate.RegisterVesselCmd =
             { Id = vesselId
               Name = name
               Mmsi = mmsi
@@ -46,12 +45,8 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
               CrewSize = 10
               Metadata = Domain.EventMetadata.createInitialMetadata (Some "SagaTest") }
 
-        vesselActor.Tell(
-            Command.VesselActor.VesselActorMessage.ExecuteCommand(
-                Domain.VesselAggregate.VesselCommand.RegisterVessel registerCmd
-            ),
-            this.TestActor
-        )
+
+        vesselActor.Tell(Command.VesselActor.ExecuteCommand(Domain.VesselAggregate.RegisterVessel cmd), this.TestActor)
 
         let result =
             this.ExpectMsg<Command.VesselActor.VesselCommandResponse>(TimeSpan.FromSeconds(5.0))
@@ -67,8 +62,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
     member private this.CreatePort(store, name, position, maxDocks) =
         let portId = Guid.NewGuid()
 
-        let portActor =
-            this.Sys.ActorOf(Command.PortActor.props portId store, $"port-{portId}")
+        let portActor = Command.PortActor.spawn this.Sys $"port-{portId}" portId store
 
         let registerCmd: Domain.PortAggregate.RegisterPortCmd =
             { Id = portId
@@ -81,7 +75,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
               Metadata = Domain.EventMetadata.createInitialMetadata (Some "SagaTest") }
 
         portActor.Tell(
-            Command.PortActor.PortActorMessage.ExecuteCommand(Domain.PortAggregate.PortCommand.RegisterPort registerCmd),
+            Command.PortActor.PortProtocol.ExecuteCommand(Domain.PortAggregate.PortCommand.RegisterPort registerCmd),
             this.TestActor
         )
 
@@ -96,7 +90,9 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
     /// Helper to set vessel in route to port - prerequisite for docking saga
     /// Creates a simple test route directly
     /// </summary>
-    member private this.SetVesselInRouteToPort(vesselId, vesselActor: IActorRef, portId, portPosition) =
+    member private this.SetVesselInRouteToPort
+        (vesselId, vesselActor: Akkling.ActorRefs.IActorRef<Command.VesselActor.VesselProtocol>, portId, portPosition)
+        =
         // Create a simple test route with the vessel already at the final waypoint
         let routeInfo: RouteInfo =
             { RouteId = Guid.NewGuid()
@@ -114,15 +110,15 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
               Metadata = Domain.EventMetadata.createInitialMetadata (Some "SagaTest") }
 
         vesselActor.Tell(
-            VesselActorMessage.ExecuteCommand(Domain.VesselAggregate.VesselCommand.UpdateOperationalStatus statusCmd),
+            Command.VesselActor.VesselProtocol.ExecuteCommand(Domain.VesselAggregate.VesselCommand.UpdateOperationalStatus statusCmd),
             this.TestActor
         )
 
-        let result = this.ExpectMsg<VesselCommandResponse>(TimeSpan.FromSeconds(5.0))
+        let result = this.ExpectMsg<Command.VesselActor.VesselCommandResponse>(TimeSpan.FromSeconds(5.0))
 
         match result with
-        | VesselCommandResponse.VesselCommandSuccess _ -> ()
-        | VesselCommandResponse.VesselCommandFailure err -> failwith $"Failed to set vessel in route: {err}"
+        | Command.VesselActor.VesselCommandResponse.VesselCommandSuccess _ -> ()
+        | Command.VesselActor.VesselCommandResponse.VesselCommandFailure err -> failwith $"Failed to set vessel in route: {err}"
 
     /// <summary>
     /// Helper to verify saga reached expected state within timeout
@@ -130,7 +126,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
     member private this.AwaitSagaState(sagaActor: IActorRef, expectedStep, timeout: TimeSpan) =
         this.AwaitAssert(
             (fun () ->
-                sagaActor.Tell(Command.DockingSaga.DockingSagaMessage.GetSagaState this.TestActor, this.TestActor)
+                sagaActor.Tell(Command.DockingSaga.DockingSagaProtocol.GetSagaState this.TestActor, this.TestActor)
 
                 let response =
                     this.ExpectMsg<Command.DockingSaga.DockingSagaStateResponse>(TimeSpan.FromSeconds(1.0))
@@ -146,19 +142,23 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
     /// <summary>
     /// Helper to verify vessel is in expected operational state
     /// </summary>
-    member private this.VerifyVesselState(vesselActor: IActorRef, expectedStatus: OperationalStatus) =
-        vesselActor.Tell(Command.VesselActor.VesselActorMessage.GetState, this.TestActor)
-        let response = this.ExpectMsg<VesselStateResponse>(TimeSpan.FromSeconds(5.0))
+    member private this.VerifyVesselState
+        (vesselActor: Akkling.ActorRefs.IActorRef<Command.VesselActor.VesselProtocol>, expectedStatus: OperationalStatus)
+        =
+        vesselActor.Tell(Command.VesselActor.VesselProtocol.GetState, this.TestActor)
+        let response = this.ExpectMsg<Command.VesselActor.VesselStateResponse>(TimeSpan.FromSeconds(5.0))
 
         match response with
-        | VesselStateResponse.VesselExists state -> Assert.Equal(expectedStatus, state.State)
-        | VesselStateResponse.VesselNotFound -> failwith "Vessel should exist"
+        | Command.VesselActor.VesselStateResponse.VesselExists state -> Assert.Equal(expectedStatus, state.State)
+        | Command.VesselActor.VesselStateResponse.VesselNotFound -> failwith "Vessel should exist"
 
     /// <summary>
     /// Helper to verify port has vessel docked
     /// </summary>
-    member private this.VerifyPortHasVesselDocked(portActor: IActorRef, vesselId: Guid) =
-        portActor.Tell(Command.PortActor.PortActorMessage.GetState, this.TestActor)
+    member private this.VerifyPortHasVesselDocked
+        (portActor: Akkling.ActorRefs.IActorRef<Command.PortActor.PortProtocol>, vesselId: Guid)
+        =
+        portActor.Tell(Command.PortActor.PortProtocol.GetState, this.TestActor)
 
         let response =
             this.ExpectMsg<Command.PortActor.PortStateResponse>(TimeSpan.FromSeconds(5.0))
@@ -176,14 +176,11 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
         // Act - Create DockingSaga actor directly
         let sagaId, sagaActor = this.CreateDockingSaga store
 
-        // Watch the actor to see if it terminates
-        this.Watch(sagaActor) |> ignore
-
         // Give actor time to initialize
         System.Threading.Thread.Sleep(100)
 
         // Query state - should be SagaNotStarted
-        sagaActor.Tell(Command.DockingSaga.DockingSagaMessage.GetSagaState this.TestActor, this.TestActor)
+        sagaActor.Tell(Command.DockingSaga.DockingSagaProtocol.GetSagaState this.TestActor, this.TestActor)
 
         let response =
             this.ExpectMsg<Command.DockingSaga.DockingSagaStateResponse>(TimeSpan.FromSeconds(1.0))
@@ -212,7 +209,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
         let metadata = Domain.EventMetadata.createInitialMetadata None
 
         let message =
-            Command.DockingSaga.DockingSagaMessage.StartDocking(vesselId, portId, metadata)
+            Command.DockingSaga.DockingSagaProtocol.StartDocking(vesselId, portId, metadata)
 
         sagaActor.Tell(message, this.TestActor)
 
@@ -231,7 +228,6 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
 
         // Verify final state - port should have vessel docked
         this.VerifyPortHasVesselDocked(portActor, vesselId)
-
 
     [<Fact>]
     member this.``DockingSaga should fail when port has no available docks``() =
@@ -255,7 +251,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
         let metadata = Domain.EventMetadata.createInitialMetadata None
 
         let message =
-            Command.DockingSaga.DockingSagaMessage.StartDocking(vesselId, portId, metadata)
+            Command.DockingSaga.DockingSagaProtocol.StartDocking(vesselId, portId, metadata)
 
         sagaActor.Tell(message, this.TestActor)
 
@@ -269,7 +265,7 @@ type DockingSagaTests(martenFixture: MartenFixture, output: Xunit.Abstractions.I
         let metadata = Domain.EventMetadata.createInitialMetadata None
 
         let message =
-            Command.DockingSaga.DockingSagaMessage.StartDocking(vesselId2, portId, metadata)
+            Command.DockingSaga.DockingSagaProtocol.StartDocking(vesselId2, portId, metadata)
 
         sagaActor2.Tell(message, this.TestActor)
 

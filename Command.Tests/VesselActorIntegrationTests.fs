@@ -1,6 +1,7 @@
 module Command.Tests.VesselActorIntegrationTests
 
 open System
+open Akkling
 open Xunit
 open Akka.TestKit.Xunit2
 open Command.VesselActor
@@ -20,7 +21,8 @@ type VesselActorIntegrationTests(fixture: MartenFixture) =
         use store = fixture.CreateStore()
         let vesselId = Guid.NewGuid()
 
-        let vesselActor = this.Sys.ActorOf(props vesselId store, $"vessel-{vesselId}")
+        let vesselActor =
+            Command.VesselActor.spawn this.Sys $"vessel-{vesselId}" vesselId store
 
         let cmd =
             { Id = vesselId
@@ -70,7 +72,7 @@ type VesselActorIntegrationTests(fixture: MartenFixture) =
         let vesselId = Guid.NewGuid()
 
         let vesselActor1 =
-            this.Sys.ActorOf(props vesselId store, $"vessel-register-{vesselId}")
+            Command.VesselActor.spawn this.Sys $"vessel-register-{vesselId}" vesselId store
 
         let registerCmd =
             { Id = vesselId
@@ -93,12 +95,13 @@ type VesselActorIntegrationTests(fixture: MartenFixture) =
         | VesselCommandSuccess eventCount -> Assert.Equal(1, eventCount)
         | VesselCommandFailure err -> failwith $"Expected success but got error: {err}"
 
-        this.Watch(vesselActor1) |> ignore
-        this.Sys.Stop(vesselActor1)
-        this.ExpectTerminated(vesselActor1, TimeSpan.FromSeconds(5.0)) |> ignore
+
+        this.Watch(untyped vesselActor1) |> ignore
+        this.Sys.Stop(untyped vesselActor1)
+        this.ExpectTerminated(untyped vesselActor1, TimeSpan.FromSeconds(5.0)) |> ignore
 
         let vesselActor2 =
-            this.Sys.ActorOf(props vesselId store, $"vessel-recover-{vesselId}")
+            Command.VesselActor.spawn this.Sys $"vessel-recover-{vesselId}" vesselId store
 
         vesselActor2.Tell(GetState, this.TestActor)
 
@@ -115,7 +118,7 @@ type VesselActorIntegrationTests(fixture: MartenFixture) =
         let vesselId = Guid.NewGuid()
 
         let vesselActor =
-            this.Sys.ActorOf(props vesselId store, $"vessel-position-{vesselId}")
+            Command.VesselActor.spawn this.Sys $"vessel-position-{vesselId}" vesselId store
 
         let registerCmd =
             { Id = vesselId
@@ -174,7 +177,7 @@ type VesselActorIntegrationTests(fixture: MartenFixture) =
         let portId = Guid.NewGuid()
 
         let vesselActor =
-            this.Sys.ActorOf(props vesselId store, $"vessel-lifecycle-{vesselId}")
+            Command.VesselActor.spawn this.Sys $"vessel-lifecycle-{vesselId}" vesselId store
 
         // Step 1: Register vessel
         let registerCmd =
@@ -263,7 +266,8 @@ type VesselActorIntegrationTests(fixture: MartenFixture) =
         let vesselId = Guid.NewGuid()
 
         let vesselActor =
-            this.Sys.ActorOf(props vesselId store, $"vessel-invalid-{vesselId}")
+            Command.VesselActor.spawn this.Sys $"vessel-invalid-{vesselId}" vesselId store
+
 
         let cmd =
             { Id = vesselId
