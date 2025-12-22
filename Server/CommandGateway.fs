@@ -22,8 +22,11 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         let actorPath = actorSystem.ActorSelection(ActorPaths.vesselActorPath vesselId)
 
         try
-            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
+            let actor = actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
+            logger.Debug("Found existing VesselActor for {VesselId}", vesselId)
+            actor
         with _ ->
+            logger.Information("Creating new VesselActor for {VesselId}", vesselId)
             VesselActor.spawn actorSystem actorName vesselId documentStore
 
     let getOrCreatePortActor (portId: Guid) : IActorRef<PortActor.PortProtocol> =
@@ -31,8 +34,11 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         let actorPath = actorSystem.ActorSelection(ActorPaths.portActorPath portId)
 
         try
-            actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
+            let actor = actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
+            logger.Debug("Found existing PortActor for {PortId}", portId)
+            actor
         with _ ->
+            logger.Information("Creating new PortActor for {PortId}", portId)
             PortActor.spawn actorSystem actorName portId documentStore
 
     let createDockingSaga (vesselId: Guid) (portId: Guid) =
@@ -58,17 +64,15 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                 let commandName =
                     FSharpValue.GetUnionFields(command, command.GetType()) |> fst |> _.Name
 
-                logger.Information("Sending vessel command to {VesselId}: {Command}", vesselId, commandName)
+                logger.Information("Sending vessel command: {Command} to {VesselId}", commandName, vesselId)
 
                 let vesselActor = getOrCreateVesselActor vesselId
                 let message = VesselActor.VesselProtocol.ExecuteCommand(command)
 
-                let! response = vesselActor.Ask<VesselActor.VesselCommandResponse>(message, Some commandTimeout) //|> Async.AwaitTask
+                let! response = vesselActor.Ask<VesselActor.VesselCommandResponse>(message, Some commandTimeout)
 
                 match response with
-                | VesselActor.VesselCommandSuccess eventCount ->
-                    logger.Information("Vessel command succeeded with {EventCount} events", eventCount)
-                    return eventCount
+                | VesselActor.VesselCommandSuccess eventCount -> return eventCount
                 | VesselActor.VesselCommandFailure error ->
                     logger.Warning("Vessel command failed: {Error}", error)
                     return! Error(error)
@@ -200,15 +204,18 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         : Async<Result<int, Shared.Api.Port.PortCommandErrors>> =
         asyncResult {
             try
+                let commandName =
+                    FSharpValue.GetUnionFields(command, command.GetType()) |> fst |> _.Name
+
+                logger.Information("Sending port command: {Command} to {PortId}", commandName, portId)
+
                 let portActor = getOrCreatePortActor portId
                 let message = PortActor.PortProtocol.ExecuteCommand(command)
 
                 let! response = portActor.Ask<PortActor.PortCommandResponse>(message, Some commandTimeout)
 
                 match response with
-                | PortActor.PortCommandSuccess eventCount ->
-                    logger.Information("Port command succeeded with {EventCount} events", eventCount)
-                    return eventCount
+                | PortActor.PortCommandSuccess eventCount -> return eventCount
                 | PortActor.PortCommandFailure error ->
                     logger.Warning("Port command failed: {Error}", error)
                     return! Error(error)
@@ -394,7 +401,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                                     logger.Information("Docking saga {SagaId} completed successfully", completedSagaId)
                                     return! Ok completedSagaId
                                 | DockingSaga.DockingSagaResponse.DockingSagaFailed(failedSagaId, error) ->
-                                    logger.Warning("Docking saga {SagaId} failed: {Error}", failedSagaId, error)
+                                    logger.Error("Docking saga {SagaId} failed: {Error}", failedSagaId, error)
 
                                     return!
                                         Error(

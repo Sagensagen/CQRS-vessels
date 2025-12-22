@@ -50,6 +50,7 @@ let private wrapPortEvent (data: obj) : PortEvent option =
 
 /// Persist events to Marten event store
 let private persistEvents
+    (logger: ILogger)
     (store: IDocumentStore)
     (portId: Guid)
     (events: PortEvent list)
@@ -63,18 +64,9 @@ let private persistEvents
         // Use StartStream for new streams (version 0), Append for existing streams
         if state.Version = 0L then
             session.Events.StartStream(portId, unwrappedEvents) |> ignore
-            Log.Information(
-                "Started new stream for port {PortId} with {EventCount} events",
-                portId,
-                events.Length
-            )
+            logger.Information("Started new stream with {EventCount} events", events.Length)
         else
             session.Events.Append(portId, unwrappedEvents) |> ignore
-            Log.Information(
-                "Appended {EventCount} events to port {PortId} stream",
-                events.Length,
-                portId
-            )
 
         do! session.SaveChangesAsync() |> Async.AwaitTask
 
@@ -82,7 +74,7 @@ let private persistEvents
     }
 
 /// Recover port state from event stream
-let private recoverState (store: IDocumentStore) (portId: Guid) =
+let private recoverState (logger: ILogger) (store: IDocumentStore) (portId: Guid) =
     async {
         try
             use session = store.QuerySession()
@@ -92,20 +84,17 @@ let private recoverState (store: IDocumentStore) (portId: Guid) =
 
             let state = events |> List.fold evolve None
 
-            Log.Information(
-                "Port {PortId} recovered from {EventCount} events",
-                portId,
-                events.Length
-            )
+            logger.Information("Recovered from {EventCount} events", events.Length)
 
             return { State = state; Version = int64 events.Length }
         with ex ->
-            Log.Error(ex, "Failed to recover port {PortId}, starting fresh", portId)
+            logger.Error(ex, "Failed to recover, starting fresh")
             return { State = None; Version = 0L }
     }
 
 /// Handle a command and persist events
 let private handleCommand
+    (logger: ILogger)
     (store: IDocumentStore)
     (portId: Guid)
     sender
@@ -113,12 +102,10 @@ let private handleCommand
     (state: PortActorState)
     =
     async {
-        Log.Information("Processing command for port {PortId}", portId)
-
         match decide state.State command with
         | Ok events ->
             try
-                let! newState = persistEvents store portId events state
+                let! newState = persistEvents logger store portId events state
 
                 // Apply events to state using fold
                 let updatedState = events |> List.fold evolve newState.State
@@ -129,18 +116,23 @@ let private handleCommand
                 return finalState
 
             with ex ->
-                Log.Error(ex, "Failed to persist events for port {PortId}", portId)
+                logger.Error(ex, "Failed to persist events")
                 sender <! PortCommandFailure(PersistenceError ex.Message)
                 return state
 
         | Error error ->
-            Log.Warning("Command failed for port {PortId}: {Error}", portId, error)
+            logger.Warning("Command failed: {Error}", error)
             sender <! PortCommandFailure(error)
             return state
     }
 
 /// Check for expired reservations and send expiration commands
-let private checkExpiredReservations (portId: Guid) selfRef (state: PortActorState) =
+let private checkExpiredReservations
+    (logger: ILogger)
+    (portId: Guid)
+    selfRef
+    (state: PortActorState)
+    =
     async {
         match state.State with
         | Some portState ->
@@ -151,10 +143,10 @@ let private checkExpiredReservations (portId: Guid) selfRef (state: PortActorSta
                 |> List.filter (fun (_, reservation) -> reservation.ExpiresAt <= now)
 
             if not expiredReservations.IsEmpty then
-                Log.Information(
-                    "Found {Count} expired reservations for port {PortId}",
+                logger.Information(
+                    "Found {Count} expired reservations: {ReservationIds}",
                     expiredReservations.Length,
-                    portId
+                    expiredReservations |> List.map fst
                 )
 
                 // Send expiration commands for each expired reservation
@@ -189,7 +181,7 @@ let createPortActor (portId: Guid) (documentStore: IDocumentStore) (ctx: Actor<P
             | ExecuteCommand command ->
                 let newState =
                     let sender = ctx.Sender()
-                    handleCommand documentStore portId sender command state
+                    handleCommand logger documentStore portId sender command state
                     |> Async.RunSynchronously
                 return! loop newState
 
@@ -202,24 +194,24 @@ let createPortActor (portId: Guid) (documentStore: IDocumentStore) (ctx: Actor<P
 
             | CheckExpiredReservations ->
                 let newState =
-                    checkExpiredReservations portId ctx.Self state |> Async.RunSynchronously
+                    checkExpiredReservations logger portId ctx.Self state |> Async.RunSynchronously
                 return! loop newState
         }
 
     // Recovery is synchronous to ensure actor starts in valid state
-    logger.Information("Starting port actor {PortId}", portId)
-    let recoveredState = recoverState documentStore portId |> Async.RunSynchronously
+    logger.Information("Starting port actor")
+    let recoveredState =
+        recoverState logger documentStore portId |> Async.RunSynchronously
 
     match recoveredState.State with
     | Some s ->
         logger.Information(
-            "Port {PortId} ready. Name: {Name}, Capacity: {Current}/{Max}",
-            portId,
+            "Port ready. Name: {Name}, Capacity: {Current}/{Max}",
             s.Name,
             s.DockedVessels.Count,
             s.MaxDocks
         )
-    | None -> logger.Information("Port {PortId} ready (new)", portId)
+    | None -> logger.Information("Port ready (new)")
 
     // Schedule periodic reservation expiry checks
     ctx.System.Scheduler.ScheduleTellRepeatedly(

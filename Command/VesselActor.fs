@@ -46,6 +46,7 @@ let private wrapVesselEvent (data: obj) : VesselEvent option =
 ///  Persist events to Marten event store
 /// </summary>
 let private persistEvents
+    (logger: ILogger)
     (store: IDocumentStore)
     (vesselId: Guid)
     (events: VesselEvent list)
@@ -58,18 +59,9 @@ let private persistEvents
 
         if state.Version = 0L then
             session.Events.StartStream(vesselId, unwrappedEvents) |> ignore
-            Log.Information(
-                "Started new stream for vessel {VesselId} with {EventCount} events",
-                vesselId,
-                events.Length
-            )
+            logger.Information("Started new stream with {EventCount} events", events.Length)
         else
             session.Events.Append(vesselId, unwrappedEvents) |> ignore
-            Log.Information(
-                "Appended {EventCount} events to vessel {VesselId} stream",
-                events.Length,
-                vesselId
-            )
 
         do! session.SaveChangesAsync() |> Async.AwaitTask
 
@@ -77,7 +69,7 @@ let private persistEvents
     }
 
 /// Recover vessel state from event stream
-let private recoverState (store: IDocumentStore) (vesselId: Guid) =
+let private recoverState (logger: ILogger) (store: IDocumentStore) (vesselId: Guid) =
     async {
         try
             use session = store.QuerySession()
@@ -87,20 +79,17 @@ let private recoverState (store: IDocumentStore) (vesselId: Guid) =
 
             let state = events |> List.fold evolve None
 
-            Log.Information(
-                "Vessel {VesselId} recovered from {EventCount} events",
-                vesselId,
-                events.Length
-            )
+            logger.Information("Recovered from {EventCount} events", events.Length)
 
             return { State = state; Version = int64 events.Length }
         with ex ->
-            Log.Error(ex, "Failed to recover vessel {VesselId}, starting fresh", vesselId)
+            logger.Error(ex, "Failed to recover, starting fresh")
             return { State = None; Version = 0L }
     }
 
 /// Handle a command and persist events
 let private handleCommand
+    (logger: ILogger)
     (store: IDocumentStore)
     (vesselId: Guid)
     (sender)
@@ -108,12 +97,10 @@ let private handleCommand
     (state: VesselActorState)
     =
     async {
-        Log.Information("Processing command for vessel {VesselId}", vesselId)
-
         match decide state.State command with
         | Ok events ->
             try
-                let! newState = persistEvents store vesselId events state
+                let! newState = persistEvents logger store vesselId events state
 
                 let updatedState = events |> List.fold evolve newState.State
                 let finalState = { newState with State = updatedState }
@@ -123,12 +110,12 @@ let private handleCommand
                 return finalState
 
             with ex ->
-                Log.Error(ex, "Failed to persist events for vessel {VesselId}", vesselId)
+                logger.Error(ex, "Failed to persist events")
                 sender <! VesselCommandFailure(PersistenceError ex.Message)
                 return state
 
         | Error error ->
-            Log.Warning("Command failed for vessel {VesselId}: {Error}", vesselId, error)
+            logger.Warning("Command failed: {Error}", error)
             sender <! VesselCommandFailure(error)
             return state
     }
@@ -148,7 +135,7 @@ let createVesselActor
             | ExecuteCommand command ->
                 let sender = ctx.Sender()
                 let newState =
-                    handleCommand documentStore vesselId sender command state
+                    handleCommand logger documentStore vesselId sender command state
                     |> Async.RunSynchronously
                 return! loop newState
 
@@ -161,18 +148,18 @@ let createVesselActor
         }
 
     // Initialize and start
-    logger.Information("Starting vessel actor {VesselId}", vesselId)
-    let recoveredState = recoverState documentStore vesselId |> Async.RunSynchronously
+    logger.Information("Starting vessel actor")
+    let recoveredState =
+        recoverState logger documentStore vesselId |> Async.RunSynchronously
 
     match recoveredState.State with
     | Some s ->
         logger.Information(
-            "Vessel {VesselId} ready. Name: {Name}, Version: {Version}",
-            vesselId,
+            "Vessel ready. Name: {Name}, Version: {Version}",
             s.Name,
             recoveredState.Version
         )
-    | None -> logger.Information("Vessel {VesselId} ready (new)", vesselId)
+    | None -> logger.Information("Vessel ready (new)")
 
     loop recoveredState
 
