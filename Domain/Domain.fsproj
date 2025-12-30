@@ -9,6 +9,7 @@
     <Compile Include="EventMetadata.fs" />
     <Compile Include="VesselAggregate.fs" />
     <Compile Include="PortAggregate.fs" />
+    <Compile Include="CargoAggregate.fs" />
   </ItemGroup>
 
   <ItemGroup>

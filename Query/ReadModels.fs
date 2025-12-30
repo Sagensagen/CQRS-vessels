@@ -4,6 +4,7 @@ open System
 open Shared.Api.Shared
 open Shared.Api.Vessel
 open Shared.Api.Port
+open Shared.Api.Cargo
 
 [<CLIMutable>]
 type VesselReadModel =
@@ -21,6 +22,7 @@ type VesselReadModel =
       CrewSize: int
       CurrentPortId: Guid option
       CurrentPortName: string option
+      CurrentCargo: CurrentVesselCargo option
       RegisteredAt: DateTimeOffset
       LastUpdated: DateTimeOffset
       Version: int64 }
@@ -45,5 +47,22 @@ type PortReadModel =
       AvailableDocks: int
       DockedVessels: DockedVesselInfo list
       RegisteredAt: DateTimeOffset
+      LastUpdated: DateTimeOffset
+      Version: int64 }
+
+[<CLIMutable>]
+type CargoReadModel =
+    { Id: Guid
+      Spec: CargoSpec
+      Status: Domain.CargoAggregate.CargoStatus
+      OriginPortId: Guid
+      OriginPortName: string option
+      DestinationPortId: Guid
+      DestinationPortName: string option
+      CurrentVesselId: Guid option
+      CurrentVesselName: string option
+      CreatedAt: DateTimeOffset
+      LoadedAt: DateTimeOffset option
+      DeliveredAt: DateTimeOffset option
       LastUpdated: DateTimeOffset
       Version: int64 }

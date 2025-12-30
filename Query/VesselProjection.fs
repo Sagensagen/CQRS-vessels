@@ -27,6 +27,7 @@ type VesselProjection() =
           CrewSize = evt.CrewSize
           CurrentPortId = None
           CurrentPortName = None
+          CurrentCargo = None
           RegisteredAt = evt.RegisteredAt
           LastUpdated = evt.RegisteredAt
           Version = 0L }
@@ -57,6 +58,19 @@ type VesselProjection() =
     member _.Apply(evt: VesselDecommissionedEvt, current: VesselReadModel) =
         { current with
             LastUpdated = evt.DecommissionedAt }
+
+    member _.Apply(evt: CargoLoadedEvt, current: VesselReadModel) =
+        { current with
+            CurrentCargo =
+                Some
+                    { CurrentCargoId = evt.CargoId
+                      CurrentCargoDestinationPortId = evt.DestinationPortId }
+            LastUpdated = evt.LoadedAt }
+
+    member _.Apply(evt: CargoUnloadedEvt, current: VesselReadModel) =
+        { current with
+            CurrentCargo = None
+            LastUpdated = evt.UnloadedAt }
 
 let registerProjection (options: Marten.StoreOptions) =
     options.Projections.Add<VesselProjection>(ProjectionLifecycle.Inline)

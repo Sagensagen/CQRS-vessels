@@ -4,6 +4,7 @@ open System
 open Expecto
 open Domain.VesselAggregate
 open Domain.EventMetadata
+open Shared.Api.Cargo
 open Shared.Api.Vessel
 open Shared.Api.Shared
 
@@ -109,6 +110,11 @@ let decideTests =
                         VesselType = VesselType.Fishing
                         CrewSize = 10
                         CurrentPortId = None
+                        MaxCargoCapacity =
+                          { MaxWeight = 10000.0<Shared.Api.Cargo.kg>
+                            MaxVolume = 500.0<Shared.Api.Cargo.m^3>
+                            MaxContainers = 50 }
+                        CurrentCargo = None
                         RegisteredAt = DateTimeOffset.UtcNow }
 
               let result = decide existingState (RegisterVessel cmd)
@@ -135,6 +141,11 @@ let decideTests =
                         VesselType = VesselType.Fishing
                         CrewSize = 10
                         CurrentPortId = None
+                        MaxCargoCapacity =
+                          { MaxWeight = 10000.0<Shared.Api.Cargo.kg>
+                            MaxVolume = 500.0<Shared.Api.Cargo.m^3>
+                            MaxContainers = 50 }
+                        CurrentCargo = None
                         RegisteredAt = DateTimeOffset.UtcNow }
 
               let cmd =
@@ -176,6 +187,11 @@ let decideTests =
                         VesselType = VesselType.Fishing
                         CrewSize = 10
                         CurrentPortId = None
+                        MaxCargoCapacity =
+                          { MaxWeight = 10000.0<Shared.Api.Cargo.kg>
+                            MaxVolume = 500.0<Shared.Api.Cargo.m^3>
+                            MaxContainers = 50 }
+                        CurrentCargo = None
                         RegisteredAt = DateTimeOffset.UtcNow }
 
               let cmd =
@@ -207,6 +223,11 @@ let decideTests =
                         Flag = "NO"
                         Position = { Latitude = 59.0; Longitude = 10.0 }
                         Length = None
+                        MaxCargoCapacity =
+                          { MaxWeight = 10.0<kg>
+                            MaxVolume = 10.0<m^3>
+                            MaxContainers = 10 }
+                        CurrentCargo = None
                         Beam = None
                         Draught = None
                         State = OperationalStatus.Docked currentPortId
@@ -279,6 +300,11 @@ let evolveTests =
                         VesselType = VesselType.Fishing
                         CrewSize = 10
                         CurrentPortId = None
+                        MaxCargoCapacity =
+                          { MaxWeight = 10000.0<Shared.Api.Cargo.kg>
+                            MaxVolume = 500.0<Shared.Api.Cargo.m^3>
+                            MaxContainers = 50 }
+                        CurrentCargo = None
                         RegisteredAt = DateTimeOffset.UtcNow }
 
               let newPosition = { Latitude = 60.0; Longitude = 11.0 }
@@ -313,6 +339,11 @@ let evolveTests =
                         VesselType = VesselType.Fishing
                         CrewSize = 10
                         CurrentPortId = None
+                        MaxCargoCapacity =
+                          { MaxWeight = 10000.0<Shared.Api.Cargo.kg>
+                            MaxVolume = 500.0<Shared.Api.Cargo.m^3>
+                            MaxContainers = 50 }
+                        CurrentCargo = None
                         RegisteredAt = DateTimeOffset.UtcNow }
 
               let evt =

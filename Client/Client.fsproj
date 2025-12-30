@@ -13,6 +13,7 @@
     <Compile Include="EventHistory.fs" />
     <Compile Include="Sidebar.fs" />
     <Compile Include="FleetMap.fs" />
+    <Compile Include="CargoPicker.fs" />
     <Compile Include="VesselStatus.fs" />
     <Compile Include="App.fs" />
     <Folder Include="public\" />

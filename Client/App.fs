@@ -54,6 +54,16 @@ let private getVesselStatistics (callback: VesselStatistics -> unit) setCtx =
   )
   |> Promise.catchEnd (fun _ -> ())
 
+let private getCargoStatistics (callback: CargoStatistics -> unit) setCtx =
+  ApiClient.Simulation.GetCargoStatistics ()
+  |> Async.StartAsPromise
+  |> Promise.map (fun res ->
+    match res with
+    | Error e -> Toasts.errorToast setCtx "getCargoStatisticsError" "Could not fetch vessel stats :(" $"{e}" None
+    | Ok vessels -> callback vessels
+  )
+  |> Promise.catchEnd (fun _ -> ())
+
 [<ReactComponent>]
 let private Application () =
   let ctx, setCtx = Context.useCtx ()
@@ -65,6 +75,7 @@ let private Application () =
     getPorts (UpdateAllPorts >> setCtx) setCtx
     getPortStatistics (fun stats -> UpdatePortStatistics (Some stats) |> setCtx) setCtx
     getVesselStatistics (fun stats -> UpdateVesselStatistics (Some stats) |> setCtx) setCtx
+    getCargoStatistics (fun stats -> UpdateCargoStatistics (Some stats) |> setCtx) setCtx
 
   )
   React.useEffect (
@@ -76,8 +87,9 @@ let private Application () =
             getPorts (UpdateAllPorts >> setCtx) setCtx
             getPortStatistics (fun stats -> UpdatePortStatistics (Some stats) |> setCtx) setCtx
             getVesselStatistics (fun stats -> UpdateVesselStatistics (Some stats) |> setCtx) setCtx
+            getCargoStatistics (fun stats -> UpdateCargoStatistics (Some stats) |> setCtx) setCtx
           ),
-          60000,
+          1000,
           []
         )
       {new System.IDisposable with

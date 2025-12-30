@@ -24,6 +24,7 @@ let private mapVesselToDTO (vessel: Query.ReadModels.VesselReadModel) : VesselDT
       Draught = vessel.Draught
       State = vessel.State
       VesselType = vessel.VesselType
+      CurrentCargo = vessel.CurrentCargo
       Inserted = vessel.RegisteredAt
       CrewSize = vessel.CrewSize }
 

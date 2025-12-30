@@ -1,6 +1,6 @@
 # CQRS-vessels
 
-A vessel and port management system demonstrating CQRS with Event Sourcing for learning purposes. The application tracks vessel positions, manages port operations, and coordinates docking procedures using the Saga pattern for distributed transactions.
+A vessel and port management system demonstrating CQRS with Event Sourcing for learning purposes. The application tracks vessel positions, manages port operations, and coordinates docking procedures and cargo loading/unloading using the Saga pattern for distributed transactions.
 
 ## Project Structure
 - Client -  Frontend stuff
@@ -12,12 +12,14 @@ A vessel and port management system demonstrating CQRS with Event Sourcing for l
 
 ## Tech
 - MartenDB for ES wrapper with PostgreSQL
-- PostGIS + PGRouting for shortest path between two coordinates
+- PostGIS + PGRouting for shortest path between two coordinates in ocean graph
 - AKKA.net actors
 - Giraffe
 - Fable+ReactJS
 
 ## Getting Started
+Nix+direnv is handy and will give you the necessary environment shell.
+
 
 ### 1. Start Infrastructure
 
@@ -78,10 +80,9 @@ ogr2ogr -f "PostgreSQL" \
         -nlt LINESTRING \
         -lco GEOMETRY_NAME=geom \
         -lco FID=gid
-
 ```
 
-Alter the columns for readability / QX(query experience)
+Alter the columns for readability / QX(query experience). This can be skipped, but routinug query needs to be updated with the original column names.
 ```sql
 ALTER TABLE ship_routes RENAME COLUMN "length0" TO "cost";
 ALTER TABLE ship_routes RENAME COLUMN "from node0" TO source;
@@ -97,8 +98,27 @@ ALTER TABLE ship_routes RENAME COLUMN "to node0" TO target;
 #### Other
 For plotting route: latLong(actually LonLat) https://tbensky.github.io/Maps/points.html
 
-## Domain rules
-1. Vessels can not dock in a port if they are not already docked. This should be a handshake/transaction through a saga in order for the dock to be reserved correctly.
-2. Vessels can move positions freely, but in order to dock a vessel has to get a route to a port, and can only dock when they have arrived(no more steps to advance in the route)
-3. Vessels can only undock when they are docked in a port duh
+## Domain Rules
+
+### Vessels
+- Can carry max one cargo at a time
+- When loaded with cargo, can ONLY route to that cargo's destination port
+- Must be at cargo's origin port to load, destination port to unload
+- Capacity limits enforced by volume and weight
+- Cannot dock without reservation (via DockingSaga) and must complete route first
+- Can only undock when docked
+
+### Cargo
+- Lifecycle: `AwaitingPickup` → `ReservedForVessel` → `LoadedOnVessel` → `InTransit` → `Delivered`
+- Must be reserved before loading (via CargoLoadingSaga)
+
+### Ports
+- Have fixed docking capacity (`MaxDocks`)
+- Docking requires reservation; reservations can expire
+- Can be `Open` or `Closed` (closed ports reject new reservations)
+
+### Sagas
+- **DockingSaga**: Coordinates vessel-port docking with two-phase commit
+- **CargoLoadingSaga**: Manages cargo reservation and loading onto vessels
+- **CargoUnloadingSaga**: Handles cargo delivery and vessel cargo clearing
 

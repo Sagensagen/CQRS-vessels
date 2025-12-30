@@ -7,8 +7,10 @@ open Marten
 open Query.ReadModels
 open Domain.VesselAggregate
 open Domain.PortAggregate
+open Domain.CargoAggregate
 open Shared.Api.Vessel
 open Shared.Api.Port
+open Shared.Api.Cargo
 open Shared.Api.Shared
 
 
@@ -47,12 +49,17 @@ let getVesselEvents (vesselId: Guid) (session: IQuerySession) =
 
         let mapped =
             events
+            |> Seq.filter (fun event ->
+                match event.Data with
+                | :? VesselPositionUpdatedEvt -> false
+                | :? VesselOperationalStatusUpdatedEvt as evt -> not evt.Status.IsInRoute
+                | _ -> true)
             |> Seq.map (fun event ->
                 match event.Data with
                 | :? VesselRegisteredEvt ->
                     { Title = "Vessel registered"
                       Description = "Vessel was registered into the system"
-                      EventType = Shared.Api.Shared.EventWrapperType.Success
+                      EventType = EventWrapperType.Success
                       Inserted = event.Timestamp }
 
                 | :? VesselDepartedEvt as ev ->
@@ -67,11 +74,12 @@ let getVesselEvents (vesselId: Guid) (session: IQuerySession) =
                       EventType = EventWrapperType.Success
                       Inserted = event.Timestamp }
 
-                | :? VesselPositionUpdatedEvt as ev ->
-                    { Title = "Position updated"
-                      Description = $"{ev.Position.Latitude},{ev.Position.Longitude}"
-                      EventType = EventWrapperType.Info
-                      Inserted = event.Timestamp }
+                // SKIP THIS AS IT POLLUTES EVENT HISTORY QUITE ALOT
+                // | :? VesselPositionUpdatedEvt as ev ->
+                //     { Title = "Position updated"
+                //       Description = $"{ev.Position.Latitude},{ev.Position.Longitude}"
+                //       EventType = EventWrapperType.Info
+                //       Inserted = event.Timestamp }
 
                 | :? VesselOperationalStatusUpdatedEvt as ev ->
                     { Title = "Status updated"
@@ -81,8 +89,8 @@ let getVesselEvents (vesselId: Guid) (session: IQuerySession) =
                         | InRoute route ->
                             // +1 for index relative to the length
                             $"InRoute: towards port {route.DestinationPortId}, {route.CurrentWaypointIndex + 1}/{route.Waypoints.Length} steps"
-                        | Docked port -> $"{ev.Status}"
-                        | Anchored pos -> $"{ev.Status}"
+                        | Docked _port -> $"{ev.Status}"
+                        | Anchored _pos -> $"{ev.Status}"
                         | UnderMaintenance -> $"{ev.Status}"
                         | Decommissioned -> $"{ev.Status}"
 
@@ -93,6 +101,18 @@ let getVesselEvents (vesselId: Guid) (session: IQuerySession) =
                     { Title = "Vessel decommissioned"
                       Description = $"{ev.DecommissionedAt}"
                       EventType = EventWrapperType.Fail
+                      Inserted = event.Timestamp }
+
+                | :? CargoLoadedEvt as ev ->
+                    { Title = "Cargo loaded"
+                      Description = $"Cargo {ev.CargoId} loaded"
+                      EventType = EventWrapperType.Success
+                      Inserted = event.Timestamp }
+
+                | :? CargoUnloadedEvt as ev ->
+                    { Title = "Cargo unloaded"
+                      Description = $"Cargo {ev.CargoId} unloaded"
+                      EventType = EventWrapperType.Success
                       Inserted = event.Timestamp }
 
                 | _ ->
@@ -128,14 +148,18 @@ let getAllPorts (session: IQuerySession) =
 let getPortsWithAvailability (session: IQuerySession) =
     asyncResult {
         let! ports =
-            session
-                .Query<PortReadModel>()
-                .Where(fun p -> p.AvailableDocks > 0 && p.Status = PortStatus.Open)
-                .OrderBy(fun p -> p.Name)
-                .ToListAsync()
+            session.Query<PortReadModel>().Where(fun p -> p.AvailableDocks > 0).OrderBy(_.Name).ToListAsync()
             |> Async.AwaitTask
 
-        return ports |> Seq.toArray
+        let openPorts =
+            ports
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | PortStatus.Open -> true
+                | _ -> false)
+            |> Seq.toArray
+
+        return openPorts |> Seq.toArray
     }
 
 let getPortEvents (portId: Guid) (session: IQuerySession) =
@@ -231,4 +255,174 @@ let getPortStatistics (session: IQuerySession) : Async<Result<Shared.Api.Simulat
                     0.0 }
 
         return stats
+    }
+
+let getCargoStatistics (session: IQuerySession) : Async<Result<Shared.Api.Simulation.CargoStatistics, string>> =
+    asyncResult {
+        let! cargo = session.Query<CargoReadModel>().ToListAsync() |> Async.AwaitTask
+
+        let total = cargo.Count
+
+        let awaitingPickup =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.AwaitingPickup -> true
+                | _ -> false)
+            |> Seq.length
+
+        let reserved =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.ReservedForVessel _ -> true
+                | _ -> false)
+            |> Seq.length
+
+        let loadedOnVessel =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.LoadedOnVessel _ -> true
+                | _ -> false)
+            |> Seq.length
+
+        let inTransit =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.InTransit _ -> true
+                | _ -> false)
+            |> Seq.length
+
+        let delivered =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.Delivered -> true
+                | _ -> false)
+            |> Seq.length
+
+        let cancelled =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.Cancelled -> true
+                | _ -> false)
+            |> Seq.length
+
+        let stats: Shared.Api.Simulation.CargoStatistics =
+            { Total = total
+              AwaitingPickup = awaitingPickup
+              Reserved = reserved
+              LoadedOnVessel = loadedOnVessel
+              InTransit = inTransit
+              Delivered = delivered
+              Cancelled = cancelled }
+
+        return stats
+    }
+
+let getCargo (cargoId: Guid) (session: IQuerySession) =
+    asyncResult {
+        let! cargo =
+            session.LoadAsync<CargoReadModel> cargoId
+            |> Async.AwaitTask
+            |> Async.map (fun c -> if obj.ReferenceEquals(c, null) then None else Some c)
+            |> AsyncResult.requireSome CargoQueryErrors.CargoNotFound
+
+        return cargo
+    }
+
+let getAllCargo (session: IQuerySession) =
+    asyncResult {
+        let! cargo =
+            session.Query<CargoReadModel>().OrderBy(fun c -> c.CreatedAt).ToListAsync()
+            |> Async.AwaitTask
+
+        return cargo |> Seq.toArray
+    }
+
+let getCargoByPort (portId: Guid) (session: IQuerySession) =
+    asyncResult {
+        let! cargo =
+            session
+                .Query<CargoReadModel>()
+                .Where(fun c -> c.OriginPortId = portId || c.DestinationPortId = portId)
+                .ToListAsync()
+            |> Async.AwaitTask
+
+        return cargo |> Seq.toArray
+    }
+
+let getCargoByVessel (vesselId: Guid) (session: IQuerySession) =
+    asyncResult {
+        let! cargo =
+            session.Query<CargoReadModel>().Where(fun c -> c.CurrentVesselId = Some vesselId).ToListAsync()
+            |> Async.AwaitTask
+
+        return cargo |> Seq.toArray
+    }
+
+let getCargoEvents (cargoId: Guid) (session: IQuerySession) =
+    asyncResult {
+        let! events = session.Events.FetchStreamAsync(cargoId) |> Async.AwaitTask
+
+        let mapped =
+            events
+            |> Seq.map (fun event ->
+                let title, description =
+                    match event.Data with
+                    | :? CargoCreatedEvt as ev ->
+                        ("Cargo created", $"From {ev.OriginPortId} to {ev.DestinationPortId}")
+                    | :? CargoLoadedOnVesselEvt as ev -> ("Loaded on vessel", $"Vessel {ev.VesselId}")
+                    | :? CargoMarkedInTransitEvt -> ("In transit", "Cargo is now in transit")
+                    | :? CargoUnloadedFromVesselEvt as ev -> ("Unloaded at port", $"Port {ev.PortId}")
+                    | :? CargoDeliveredEvt -> ("Delivered", "Cargo delivered to destination")
+                    | :? CargoCancelledEvt -> ("Cancelled", "Cargo was cancelled")
+                    | _ -> ("Unknown event", event.Data.GetType().Name)
+
+                { Title = title
+                  Description = description
+                  EventType = EventWrapperType.Info
+                  Inserted = event.Timestamp })
+
+        return mapped
+    }
+
+let getAvailableCargoAtPort (portId: Guid) (session: IQuerySession) =
+    asyncResult {
+        let! cargo =
+            session.Query<CargoReadModel>().Where(fun c -> c.OriginPortId = portId).ToListAsync()
+            |> Async.AwaitTask
+
+        // Filter in memory after loading
+        let availableCargo =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.AwaitingPickup -> true
+                | _ -> false)
+            |> Seq.toArray
+
+        return availableCargo
+    }
+
+/// Get all reserved cargo at a specific port with reservation details
+let getReservedCargoAtPort (portId: Guid) (session: IQuerySession) =
+    asyncResult {
+        let! cargo =
+            session.Query<CargoReadModel>().Where(fun c -> c.OriginPortId = portId).ToListAsync()
+            |> Async.AwaitTask
+
+        // Filter in memory after loading
+        let reservedCargo =
+            cargo
+            |> Seq.filter (fun c ->
+                match c.Status with
+                | CargoStatus.ReservedForVessel _ -> true
+                | _ -> false)
+            |> Seq.toArray
+
+        return reservedCargo
     }

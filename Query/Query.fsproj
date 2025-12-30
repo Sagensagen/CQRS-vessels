@@ -9,7 +9,9 @@
     <Compile Include="ReadModels.fs" />
     <Compile Include="VesselProjection.fs" />
     <Compile Include="PortProjection.fs" />
+    <Compile Include="CargoProjection.fs" />
     <Compile Include="QueryHandlers.fs" />
+    <Compile Include="CargoProjection.fs" />
   </ItemGroup>
 
   <ItemGroup>

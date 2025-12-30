@@ -9,9 +9,9 @@ open FsToolkit.ErrorHandling
 open Marten
 open Domain.VesselAggregate
 open Domain.PortAggregate
+open Domain.CargoAggregate
 open Serilog
 open Microsoft.FSharp.Reflection
-open Shared.Api.Vessel
 
 type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
     let logger = Log.ForContext<CommandGateway>()
@@ -40,6 +40,18 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
         with _ ->
             logger.Information("Creating new PortActor for {PortId}", portId)
             PortActor.spawn actorSystem actorName portId documentStore
+
+    let getOrCreateCargoActor (cargoId: Guid) : IActorRef<CargoActor.CargoProtocol> =
+        let actorName = ActorPaths.cargoActorName cargoId
+        let actorPath = actorSystem.ActorSelection(ActorPaths.cargoActorPath cargoId)
+
+        try
+            let actor = actorPath.ResolveOne(TimeSpan.FromSeconds 1.0).Result |> typed
+            logger.Debug("Found existing CargoActor for {CargoId}", cargoId)
+            actor
+        with _ ->
+            logger.Information("Creating new CargoActor for {CargoId}", cargoId)
+            CargoActor.spawn actorSystem actorName cargoId documentStore
 
     let createDockingSaga (vesselId: Guid) (portId: Guid) =
         let sagaId = Guid.NewGuid()
@@ -333,7 +345,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                             |> Result.requireFalse Shared.Api.Vessel.VesselCommandErrors.VesselIsAlreadyArrived
 
                         match vesselState.State with
-                        | InRoute route when route.CurrentWaypointIndex + 1 < route.Waypoints.Length ->
+                        | Shared.Api.Vessel.InRoute route when route.CurrentWaypointIndex + 1 < route.Waypoints.Length ->
                             return! Error Shared.Api.Vessel.VesselCommandErrors.RouteNotFinished
                         | _ -> ()
                         // Get port actor and validate port state
@@ -386,7 +398,7 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
                                     portState.Name
                                 )
 
-                                let sagaId, sagaActor = createDockingSaga vesselId portId
+                                let _sagaId, sagaActor = createDockingSaga vesselId portId
 
                                 let metadata = Domain.EventMetadata.createInitialMetadata actor
 
@@ -508,4 +520,184 @@ type CommandGateway(actorSystem: ActorSystem, documentStore: IDocumentStore) =
 
             logger.Information("Successfully undocked vessel {VesselId} from port {PortId}", vesselId, portId)
             return undockResult
+        }
+
+    member _.SendCargoCommand
+        (cargoId: Guid, command: CargoCommand)
+        : Async<Result<int, Shared.Api.Cargo.CargoCommandErrors>> =
+        asyncResult {
+            try
+                let commandName =
+                    FSharpValue.GetUnionFields(command, command.GetType()) |> fst |> _.Name
+
+                logger.Information("Sending cargo command: {Command} to {CargoId}", commandName, cargoId)
+
+                let cargoActor = getOrCreateCargoActor cargoId
+                let message = CargoActor.CargoProtocol.ExecuteCommand(command)
+
+                let! response = cargoActor.Ask<CargoActor.CargoCommandResponse>(message, Some commandTimeout)
+
+                match response with
+                | CargoActor.CargoCommandSuccess eventCount -> return eventCount
+                | CargoActor.CargoCommandFailure error ->
+                    logger.Warning("Cargo command failed: {Error}", error)
+
+                    return! Error(error)
+            with
+            | :? TaskCanceledException ->
+                logger.Error("Cargo command to {CargoId} timed out", cargoId)
+                return! Error(Shared.Api.Cargo.CargoCommandErrors.PersistenceError("Command timed out"))
+            | ex ->
+                logger.Error(ex, "Cargo command to {CargoId} failed with exception", cargoId)
+                return! Error(Shared.Api.Cargo.CargoCommandErrors.PersistenceError(ex.Message))
+        }
+
+    member this.CreateCargo
+        (id: Guid, spec: Shared.Api.Cargo.CargoSpec, originPortId: Guid, destinationPortId: Guid, actor: string option)
+        : Async<Result<Guid, Shared.Api.Cargo.CargoCommandErrors>> =
+        asyncResult {
+            let metadata = Domain.EventMetadata.createInitialMetadata actor
+
+            let command =
+                CreateCargo
+                    { Id = id
+                      Spec = spec
+                      OriginPortId = originPortId
+                      DestinationPortId = destinationPortId
+                      Metadata = metadata }
+
+            let! _ = this.SendCargoCommand(id, command)
+            return id
+        }
+
+    member this.LoadCargoOntoVessel
+        (cargoId: Guid, vesselId: Guid, portId: Guid, cargoSpec: Shared.Api.Cargo.CargoSpec, actor: string option)
+        : Async<Result<Guid, Shared.Api.Cargo.CargoCommandErrors>> =
+        asyncResult {
+            try
+                logger.Information(
+                    "Starting cargo loading saga for cargo {CargoId} onto vessel {VesselId}",
+                    cargoId,
+                    vesselId
+                )
+
+                let portActor = getOrCreatePortActor portId
+                let vesselActor = getOrCreateVesselActor vesselId
+                let cargoActor = getOrCreateCargoActor cargoId
+
+                // First, get vessel state to extract destination port from route
+                let! vesselStateResponse =
+                    vesselActor.Ask<VesselActor.VesselStateResponse>(
+                        VesselActor.VesselProtocol.GetState,
+                        Some commandTimeout
+                    )
+
+                let! portStateResponse =
+                    portActor.Ask<PortActor.PortStateResponse>(PortActor.PortProtocol.GetState, Some commandTimeout)
+
+                let! cargoStateResponse =
+                    cargoActor.Ask<CargoActor.CargoStateResponse>(
+                        CargoActor.CargoProtocol.GetState,
+                        Some commandTimeout
+                    )
+
+                // Validate actors are alive before reaching them. Will start them if not alive
+                match vesselStateResponse, portStateResponse, cargoStateResponse with
+                | VesselActor.VesselExists _vesselState,
+                  PortActor.PortExists _portState,
+                  CargoActor.CargoExists cargoState ->
+                    let sagaId = Guid.NewGuid()
+                    let sagaName = ActorPaths.cargoLoadingSagaName sagaId
+
+                    let sagaActor = CargoLoadingSaga.spawn actorSystem sagaName
+
+                    let startMessage =
+                        CargoLoadingSaga.StartLoading(
+                            cargoId,
+                            vesselId,
+                            portId,
+                            cargoState.DestinationPortId,
+                            cargoSpec
+                        )
+
+                    sagaActor <! startMessage
+
+                    logger.Information(
+                        "Cargo loading saga {SagaId} started for cargo from {OriginPort} to {DestinationPort}",
+                        sagaId,
+                        portId,
+                        cargoState.DestinationPortId
+                    )
+
+                    return sagaId
+                | _ -> return! Error Shared.Api.Cargo.CargoNotFound
+
+            with ex ->
+                logger.Error(ex, "Failed to start cargo loading saga")
+                return! Error(Shared.Api.Cargo.CargoCommandErrors.PersistenceError(ex.Message))
+        }
+
+    member this.UnloadCargoFromVessel
+        (cargoId: Guid, vesselId: Guid, portId: Guid, isDestinationPort: bool, actor: string option)
+        : Async<Result<Guid, Shared.Api.Cargo.CargoCommandErrors>> =
+        asyncResult {
+            try
+                logger.Information(
+                    "Starting cargo unloading saga for cargo {CargoId} from vessel {VesselId} at port {PortId}",
+                    cargoId,
+                    vesselId,
+                    portId
+                )
+
+                let sagaId = Guid.NewGuid()
+                let sagaName = ActorPaths.cargoUnloadingSagaName sagaId
+
+                let sagaActor = CargoUnloadingSaga.spawn actorSystem sagaName
+
+                let startMessage =
+                    CargoUnloadingSaga.StartUnloading(cargoId, vesselId, portId, isDestinationPort)
+
+                sagaActor <! startMessage
+
+                logger.Information("Cargo unloading saga {SagaId} started", sagaId)
+                return sagaId
+
+            with ex ->
+                logger.Error(ex, "Failed to start cargo unloading saga")
+                return! Error(Shared.Api.Cargo.CargoCommandErrors.PersistenceError(ex.Message))
+        }
+
+    member this.CancelCargo
+        (cargoId: Guid, actor: string option)
+        : Async<Result<Guid, Shared.Api.Cargo.CargoCommandErrors>> =
+        asyncResult {
+            let metadata = Domain.EventMetadata.createInitialMetadata actor
+
+            let command =
+                Domain.CargoAggregate.CargoCommand.CancelCargo
+                    { AggregateId = cargoId
+                      Reason = "Cancel reason not given :)"
+                      Metadata = metadata }
+
+            let! _ = this.SendCargoCommand(cargoId, command)
+            return cargoId
+        }
+
+    member this.GetVesselState(vesselId: Guid) : Async<Result<Domain.VesselAggregate.VesselState option, string>> =
+        async {
+            try
+                let vesselActor = getOrCreateVesselActor vesselId
+
+                let! response =
+                    vesselActor.Ask<VesselActor.VesselStateResponse>(
+                        VesselActor.VesselProtocol.GetState,
+                        Some commandTimeout
+                    )
+
+                match response with
+                | VesselActor.VesselExists state -> return Ok(Some state)
+                | VesselActor.VesselNotFound -> return Ok None
+            with ex ->
+                logger.Error(ex, "Failed to get vessel state for {VesselId}", vesselId)
+                return Error(ex.Message)
         }

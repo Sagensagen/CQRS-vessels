@@ -5,6 +5,7 @@ open Browser.Types
 open Feliz.PigeonMaps
 open Feliz
 open FS.FluentUI
+open Shared.Api.Cargo
 open Shared.Api.Shared
 open Shared.Api.Vessel
 open Fable.Core
@@ -50,9 +51,10 @@ let private updatePosition (vesselId: Guid) (position: LatLong) callback setCtx 
 [<ReactComponent>]
 let private VesselPositionDialog (vessel: VesselDTO) =
   let position, setPosition = React.useState<LatLong option> (Some vessel.Position)
-  let ctx, setCtx = Context.useCtx ()
+  let _ctx, setCtx = Context.useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
+
   Fui.dialog [
     dialog.open' isOpen
     dialog.onOpenChange (fun (d: DialogOpenChangeData<MouseEvent>) -> setIsOpen d.``open``)
@@ -118,7 +120,7 @@ let private VesselPositionDialog (vessel: VesselDTO) =
                       | Some latLong ->
                         PigeonMaps.marker [
                           marker.anchor (latLong.Latitude, latLong.Longitude)
-                          marker.render (fun marker ->
+                          marker.render (fun _ ->
                             Fui.icon.vehicleShipFilled [
                               icon.size.``28``
                               icon.primaryFill Theme.tokens.colorBrandBackground
@@ -152,7 +154,7 @@ let private VesselPositionDialog (vessel: VesselDTO) =
                             updatePosition
                               vessel.Id
                               pos
-                              (fun id ->
+                              (fun _id ->
                                 setIsSending false
                                 setIsOpen false
                               )
@@ -297,7 +299,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                         Fui.text "Arrive at port"
                         Fui.icon.locationArrowLeftRegular [icon.size.``24``]
                       ]
-                      card.onClick (fun _ -> setStatus (Some (Arrive (Guid.Empty))))
+                      card.onClick (fun _ -> setStatus (Some (Arrive Guid.Empty)))
                     ]
                     Fui.card [
                       let isSelected =
@@ -369,12 +371,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                          | Some (Anchor _) -> true
                          | _ -> false)
                       card.orientation.horizontal
-                      card.disabled (
-                        true
-                      // match vessel.State with
-                      // | Anchored _ -> true
-                      // | _ -> false
-                      )
+                      card.disabled true
                       card.style [
                         if isSelected then
                           style.backgroundColor Theme.tokens.colorBrandBackgroundInvertedSelected
@@ -396,13 +393,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                          | Some StartMaintenance -> true
                          | _ -> false)
                       card.orientation.horizontal
-                      card.disabled (
-                        true
-                      // match vessel.State with
-
-                      // | UnderMaintenance -> true
-                      // | _ -> false
-                      )
+                      card.disabled true
                       card.style [
                         if isSelected then
                           style.backgroundColor Theme.tokens.colorBrandBackgroundInvertedSelected
@@ -417,24 +408,6 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                       ]
                       card.onClick (fun _ -> setStatus (Some StartMaintenance))
                     ]
-                  // Fui.card [
-                  //   card.orientation.horizontal
-                  //   card.style [style.minWidth 250; style.maxWidth (length.perc 100); style.display.flex]
-                  //   card.selected false
-                  //   card.children [
-                  //     Fui.text "Start loading"
-                  //     Fui.icon.boxArrowUpRegular [icon.size.``24``]
-                  //   ]
-                  // ]
-                  // Fui.card [
-                  //   card.orientation.horizontal
-                  //   card.style [style.minWidth 250; style.maxWidth (length.perc 100); style.display.flex]
-                  //   card.selected false
-                  //   card.children [
-                  //     Fui.text "Start unloading"
-                  //     Fui.icon.cubeArrowCurveDownRegular [icon.size.``24``]
-                  //   ]
-                  // ]
                   ]
                 ]
                 match status with
@@ -461,11 +434,6 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                               ]
                             )
                         ]
-                      ]
-                      Fui.input [
-                        input.value port
-                        input.placeholder "What port are you docking at?"
-                        input.onChange (fun (v: string) -> setStatus (Some (Arrive (Guid.NewGuid ()))))
                       ]
                     ]
                   ]
@@ -554,7 +522,7 @@ let private VesselStatusDialog (vessel: VesselDTO) =
                       updateOperationalStatus
                         vessel.Id
                         someStatus
-                        (fun s ->
+                        (fun _s ->
                           setIsSending false
                           setIsOpen false
                         )
@@ -573,6 +541,26 @@ let private VesselStatusDialog (vessel: VesselDTO) =
 [<ReactComponent>]
 let VesselStatus () =
   let ctx, setCtx = Context.useCtx ()
+  let loadedCargo, setLoadedCargo = React.useState None
+
+  React.useEffectOnce (fun _ ->
+    match ctx.SelectedVessel with
+    | Some vessel ->
+      match vessel.CurrentCargo with
+      | Some cargo ->
+        ApiClient.Cargo.GetCargo cargo.CurrentCargoId
+        |> Async.StartAsPromise
+        |> Promise.map (fun res ->
+          match res with
+          | Ok c -> setLoadedCargo (Some c)
+          | Error e -> Toasts.errorToast setCtx "GetCargoError" "Could not get cargo for vessel" $"{e}" None
+        )
+        |> Promise.catchEnd (fun e ->
+          Toasts.errorToast setCtx "GetCargoError" "Could not get cargo for vessel" $"{e}" None
+        )
+      | None -> ()
+    | None -> ()
+  )
 
   Html.div [
     prop.style [
@@ -602,6 +590,43 @@ let VesselStatus () =
           prop.children [
             VesselStatusDialog vessel
             VesselPositionDialog vessel
+            CargoPicker.CargoDialog vessel
+            match vessel.State with
+
+            | Docked dockedPort ->
+              match vessel.CurrentCargo with
+              | Some cargo ->
+                Fui.button [
+                  button.text "Unload cargo"
+                  button.appearance.primary
+                  button.icon (Fui.icon.boxArrowLeftRegular [])
+                  button.iconPosition.after
+                  button.onClick (fun _ ->
+                    match vessel.State with
+                    | Docked _portId ->
+                      ApiClient.Cargo.UnloadCargoFromVessel {
+                        CargoId = cargo.CurrentCargoId
+                        VesselId = vessel.Id
+                        PortId = cargo.CurrentCargoDestinationPortId
+                        IsDestinationPort = (cargo.CurrentCargoDestinationPortId = dockedPort)
+                      }
+                      |> Async.StartAsPromise
+                      |> Promise.iter (fun res ->
+                        match res with
+                        | Ok _ -> Toasts.successToast setCtx "UnloadCargoFromVesselSuccess" "Started unloading" ""
+                        | Error e ->
+                          Toasts.errorToast
+                            setCtx
+                            "UnloadCargoFromVesselError"
+                            "Failed to request unloading"
+                            $"{e}"
+                            None
+                      )
+                    | _ -> Toasts.warningToast setCtx "sdsds" "Not at port" "Cargo not yet a port" None
+                  )
+                ]
+              | _ -> ()
+            | _ -> ()
           ]
         ]
         Html.div [
@@ -638,7 +663,7 @@ let VesselStatus () =
                       | Anchored pos -> $"Anchored at {pos}"
                       | UnderMaintenance -> "UnderMaintenance"
                       | Decommissioned -> "Decommissioned"
-                      | InRoute route -> "In route"
+                      | InRoute _ -> "In route"
                     )
                   ]
                 ]
@@ -748,8 +773,121 @@ let VesselStatus () =
                 ]
               ]
             ]
+            match vessel.CurrentCargo with
+            | None -> ()
+            | Some cargo ->
+              Fui.card [
+                card.appearance.filled
+                card.style [
+                  style.justifyContent.spaceBetween
+                  style.display.flex
+                  style.flexDirection.row
+                  style.height 150
+                  style.width 250
+                  style.padding (length.rem 1)
+                ]
+                card.children [
+                  Html.div [
+                    prop.style [
+                      style.display.flex
+                      style.flexDirection.column
+                      style.gap 5
+                    ]
+                    prop.children [
+                      Fui.text "Loaded cargo"
+                      Fui.text.subtitle1 $"{cargo.CurrentCargoId}"
+                    ]
+                  ]
+                  Html.div [
+                    prop.children [
+                      Fui.icon.boxRegular [
+                        icon.size.``32``
+                        icon.primaryFill Theme.tokens.colorBrandForeground2
+                      ]
+                    ]
+                  ]
+                ]
+              ]
           ]
         ]
+        match loadedCargo with
+        | None -> ()
+        | Some cargo ->
+          Fui.card [
+            card.style [
+              style.height 300
+              style.minHeight 300
+              style.width (length.perc 100)
+            ]
+            card.children [
+              Fui.cardHeader [
+                cardHeader.header (Fui.text.subtitle1 "Cargo information")
+              ]
+              Html.div [
+                prop.style [
+                  style.display.flex
+                  style.flexWrap.wrap
+                  style.gap (length.rem 1)
+                ]
+                prop.children [
+                  Fui.field [
+                    field.label "Cargo id"
+                    field.children [
+                      Fui.text.body1Strong [
+                        text.style [style.minWidth 400]
+                        text.text $"{cargo.Id}"
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.label "Origin"
+                    field.children [
+                      Fui.text.body1Strong [
+                        text.style [style.minWidth 400]
+                        text.text (cargo.OriginPortId.ToString ())
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.label "Destination"
+                    field.children [
+                      Fui.text.body1Strong [
+                        text.style [style.minWidth 400]
+                        text.text (cargo.DestinationPortId.ToString ())
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.label "Type"
+                    field.children [
+                      Fui.text.body1Strong [
+                        text.style [style.minWidth 400]
+                        text.text (cargo.Spec.CargoType.ToString ())
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.label "Weight"
+                    field.children [
+                      Fui.text.body1Strong [
+                        text.style [style.minWidth 400]
+                        text.text $"{cargo.Spec.TotalWeight} Kg"
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.label "Volume"
+                    field.children [
+                      Fui.text.body1Strong [
+                        text.style [style.minWidth 400]
+                        text.text $"{cargo.Spec.TotalVolume} mˆ3"
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
         Fui.card [
           card.style [
             style.height 300
@@ -790,7 +928,7 @@ let VesselStatus () =
                   field.children [
                     Fui.text.body1Strong [
                       text.style [style.minWidth 400]
-                      text.text (vessel.Inserted.ToString ("dd MMM yyyy"))
+                      text.text (vessel.Inserted.ToString "dd MMM yyyy")
                     ]
                   ]
                 ]
@@ -798,6 +936,6 @@ let VesselStatus () =
             ]
           ]
         ]
-        EventHistory.VesselEvents (id)
+        EventHistory.VesselEvents id
     ]
   ]

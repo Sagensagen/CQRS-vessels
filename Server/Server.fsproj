@@ -12,6 +12,7 @@
     <Compile Include="RemotingHelpers.fs" />
     <Compile Include="Api\Vessel.fs" />
     <Compile Include="Api\Port.fs" />
+    <Compile Include="Api\Cargo.fs" />
     <Compile Include="Simulation.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

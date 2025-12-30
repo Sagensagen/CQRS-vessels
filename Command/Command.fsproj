@@ -11,6 +11,9 @@
     <Compile Include="VesselActor.fs" />
     <Compile Include="PortActor.fs" />
     <Compile Include="DockingSaga.fs" />
+    <Compile Include="CargoActor.fs" />
+    <Compile Include="CargoLoadingSaga.fs" />
+    <Compile Include="CargoUnloadingSaga.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Domain\Domain.fsproj" />

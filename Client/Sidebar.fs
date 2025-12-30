@@ -4,7 +4,6 @@ open System
 open Browser.Types
 open Client.Context
 open FS.FluentUI.V8toV9
-open Fable.React
 open Feliz
 open FS.FluentUI
 open Shared.Api.Port
@@ -14,7 +13,7 @@ open Fable.Core
 
 [<ReactComponent>]
 let private AddPortDialog () =
-  let _ctx, setCtx = Context.useCtx ()
+  let _ctx, setCtx = useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
   let form, setForm = React.useState RegisterPortRequest.DefaultEmpty
@@ -27,11 +26,11 @@ let private AddPortDialog () =
       | Error e ->
         Toasts.errorToast setCtx "CreatePortFailed" "Could not create port" $"{e}" None
         setIsSending false
-      | Ok accs ->
+      | Ok res ->
         setIsSending false
         setIsOpen false
         setForm RegisterPortRequest.DefaultEmpty
-        Toasts.successToast setCtx $"CreatePort{accs}Success" "Port created" $"Port {accs} created"
+        Toasts.successToast setCtx $"CreatePort{res}Success" "Port created" $"Port {res} created"
     )
     |> Promise.catchEnd (fun _ -> setIsSending false)
 
@@ -67,7 +66,7 @@ let private AddPortDialog () =
                 style.gap (length.rem 1)
               ]
               dialogContent.children [
-                Fui.text.caption1 "Add new port to the system and let vesseles start docking"
+                Fui.text.caption1 "Add new port to the system and let vessels start docking"
                 Fui.field [
                   field.label "Name"
                   field.children [
@@ -101,7 +100,7 @@ let private AddPortDialog () =
                           input.onChange (fun (v: string) ->
                             Double.TryParse v
                             |> function
-                              | true, f -> setForm {form with Position = {form.Position with Latitude = f}}
+                              | true, f -> setForm {form with Position.Latitude = Math.Round (f, 6)}
                               | _ -> ()
                           )
                           input.placeholder "0011.0"
@@ -118,7 +117,7 @@ let private AddPortDialog () =
                           input.onChange (fun (v: string) ->
                             Double.TryParse v
                             |> function
-                              | true, f -> setForm {form with Position = {form.Position with Longitude = f}}
+                              | true, f -> setForm {form with Position.Longitude = Math.Round (f, 6)}
                               | _ -> ()
                           )
                           input.placeholder "0011.0"
@@ -134,7 +133,10 @@ let private AddPortDialog () =
                     Fui.input [
                       input.type'.number
                       input.value form.MaxDocks
-                      input.onChange (fun v -> setForm {form with MaxDocks = v})
+                      input.onChange (fun v ->
+                        if v > 0 then
+                          setForm {form with MaxDocks = v}
+                      )
                       input.placeholder "10"
                     ]
                   ]
@@ -177,7 +179,7 @@ let private AddPortDialog () =
 
 [<ReactComponent>]
 let private AddVesselDialog () =
-  let _ctx, setCtx = Context.useCtx ()
+  let _ctx, setCtx = useCtx ()
   let isOpen, setIsOpen = React.useState false
   let isSending, setIsSending = React.useState false
   let form, setForm = React.useState RegisterVesselRequest.DefaultEmpty
@@ -190,11 +192,11 @@ let private AddVesselDialog () =
       | Error e ->
         Toasts.errorToast setCtx "CreateVesselFailed" "Could not create vessel" $"{e}" None
         setIsSending false
-      | Ok accs ->
+      | Ok res ->
         setIsSending false
         setIsOpen false
         setForm RegisterVesselRequest.DefaultEmpty
-        Toasts.successToast setCtx $"CreateVessel{accs}Success" "Vessel created" $"Vessel {accs} created"
+        Toasts.successToast setCtx $"CreateVessel{res}Success" "Vessel created" $"Vessel {res} created"
     )
     |> Promise.catchEnd (fun _ -> ())
 
@@ -257,7 +259,10 @@ let private AddVesselDialog () =
                     Fui.input [
                       input.type'.number
                       input.value form.Mmsi
-                      input.onChange (fun v -> setForm {form with Mmsi = v})
+                      input.onChange (fun v ->
+                        if v < 999999999 then
+                          setForm {form with Mmsi = v}
+                      )
                       input.placeholder "1234"
                     ]
                   ]
@@ -268,7 +273,10 @@ let private AddVesselDialog () =
                     Fui.input [
                       input.type'.number
                       input.value (form.Imo |> Option.defaultValue 0)
-                      input.onChange (fun v -> setForm {form with Imo = Some v})
+                      input.onChange (fun v ->
+                        if v < 9999999 then
+                          setForm {form with Imo = Some v}
+                      )
                       input.placeholder "1234"
                     ]
                   ]
@@ -279,13 +287,16 @@ let private AddVesselDialog () =
                     Fui.input [
                       input.type'.number
                       input.value form.CrewSize
-                      input.onChange (fun v -> setForm {form with CrewSize = v})
+                      input.onChange (fun v ->
+                        if v > 0 then
+                          setForm {form with CrewSize = v}
+                      )
                       input.placeholder "1"
                     ]
                   ]
                 ]
                 Fui.field [
-                  field.label "Vesseltype"
+                  field.label "Vessel type"
                   field.children [
                     Fui.dropdown [
                       dropdown.children [
@@ -318,9 +329,6 @@ let private AddVesselDialog () =
                     ]
                   ]
                 ]
-                Fui.text "Length"
-                Fui.text "Beam"
-                Fui.text "Draught"
               ]
             ]
             Fui.dialogActions [
@@ -359,7 +367,7 @@ let private AddVesselDialog () =
 
 [<ReactComponent>]
 let private VesselDropdown (onSelect: VesselDTO option -> unit) =
-  let ctx, _setCtx = Context.useCtx ()
+  let ctx, _setCtx = useCtx ()
   Fui.field [
     field.label "Select vessel"
     field.children [
@@ -401,8 +409,9 @@ let private VesselDropdown (onSelect: VesselDTO option -> unit) =
 
 [<ReactComponent>]
 let SimulationDialog () =
-  let simulationForm, setSimulationForm = React.useState 0
-  let ctx, setCtx = Context.useCtx ()
+  let simulationForm, setSimulationForm =
+    React.useState {VesselCount = 5; PortCount = 5; PositionAdvanceDelayMilliseconds = 2000}
+  let ctx, setCtx = useCtx ()
   let isOpen, setIsOpen = React.useState false
   Fui.dialog [
     dialog.open' isOpen
@@ -464,26 +473,56 @@ let SimulationDialog () =
                         | Ok () ->
                           setIsOpen false
                           UpdateIsSimulating (not ctx.IsSimulating) |> setCtx
-                        | Error e -> ()
+                        | Error _ -> ()
                       )
                       |> Promise.catchEnd (fun _ -> ())
                     )
                   ]
                 else
                   Fui.text
-                    "This request will dispatch the given number of vessels into the system, and will randomly try to move, dock, undock. There are 50 ports created as well and can be full/available and will reject vessels trying to dock if the latter. Cap is 1000"
+                    "This request will dispatch the given number of vessels into the system, and will randomly try to move, dock, undock. There are maximum 50 ports created as well and can be full/available and will reject vessels trying to dock if the latter. Cap is 150"
                   Fui.field [
-                    field.validationMessage
+                    field.hint
                       "Do not deploy too many vessels. The browser will not be happy rendering 10k vessels per 5sec."
-                    field.validationState.none
                     field.label "Number of vessels"
                     field.children [
                       Fui.input [
-                        input.value simulationForm
+                        input.value simulationForm.VesselCount
                         input.type'.number
                         input.onChange (fun v ->
-                          if v >= 0 && v <= 1000 then
-                            setSimulationForm v
+                          if v >= 1 && v <= 150 then
+                            setSimulationForm {simulationForm with VesselCount = v}
+                        )
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.validationState.none
+                    field.hint "The ports will be picked randomly from around the world"
+                    field.label "Number of ports"
+                    field.children [
+                      Fui.input [
+                        input.value simulationForm.PortCount
+                        input.type'.number
+                        input.onChange (fun v ->
+                          if v >= 1 && v <= 50 then
+                            setSimulationForm {simulationForm with PortCount = v}
+                        )
+                      ]
+                    ]
+                  ]
+                  Fui.field [
+                    field.validationState.none
+                    field.hint
+                      "The simulation iterates on each vessel, and execute a naturally next command/event to happen with a given timespan between the position movements"
+                    field.label "Positions iteration delay milliseconds"
+                    field.children [
+                      Fui.input [
+                        input.value simulationForm.PositionAdvanceDelayMilliseconds
+                        input.type'.number
+                        input.onChange (fun v ->
+                          if v <= 30000 then
+                            setSimulationForm {simulationForm with PositionAdvanceDelayMilliseconds = v}
                         )
                       ]
                     ]
@@ -505,7 +544,7 @@ let SimulationDialog () =
                   ]
                   Fui.button [
                     button.icon (Fui.icon.rocketRegular [])
-                    button.disabled (0 = simulationForm)
+                    button.disabled (0 = simulationForm.VesselCount)
                     button.appearance.primary
                     button.text "Start"
                     button.onClick (fun _ ->
@@ -516,7 +555,7 @@ let SimulationDialog () =
                         | Ok () ->
                           UpdateIsSimulating (not ctx.IsSimulating) |> setCtx
                           setIsOpen false
-                        | Error e -> ()
+                        | Error _ -> ()
                       )
                       |> Promise.catchEnd (fun _ -> ())
                     )
@@ -531,7 +570,7 @@ let SimulationDialog () =
 
 [<ReactComponent>]
 let SideBar () =
-  let ctx, setCtx = Context.useCtx ()
+  let ctx, setCtx = useCtx ()
   Fui.fluentProvider [
     fluentProvider.theme.createDarkTheme maritimeBlueBrands
     fluentProvider.children [
