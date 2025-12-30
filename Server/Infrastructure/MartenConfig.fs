@@ -23,7 +23,7 @@ let configureMarten (services: IServiceCollection) =
 
         Query.VesselProjection.registerProjection options
         Query.PortProjection.registerProjection options
-
+        Query.CargoProjection.registerProjection options
 
         options.Advanced.DuplicatedFieldEnumStorage <- EnumStorage.AsString
         options.Advanced.DuplicatedFieldUseTimestampWithoutTimeZoneForDateTime <- false

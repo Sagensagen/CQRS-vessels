@@ -9,9 +9,9 @@ open Shared.Api.Vessel
 // Deterministic color based on the Guid given
 let guidToColor (guid: System.Guid) : string =
   let bytes = guid.ToByteArray ()
-  let r = int bytes.[0]
-  let g = int bytes.[1]
-  let b = int bytes.[2]
+  let r = int bytes[0]
+  let g = int bytes[1]
+  let b = int bytes[2]
   sprintf "#%02x%02x%02x" r g b
 
 // Shows statistics of all the ports and vessels in the mixer
@@ -31,8 +31,8 @@ let private StatisticsPanel () =
       style.flexDirection.column
     ]
     prop.children [
-      match ctx.PortStatistics, ctx.VesselStatistics with
-      | Some portStats, Some vesselStats ->
+      match ctx.PortStatistics, ctx.VesselStatistics, ctx.CargoStatistics with
+      | Some portStats, Some vesselStats, Some cargoStats ->
         Fui.text.subtitle2 "Port stats"
         Fui.text $"Total ports: {portStats.Total}"
         Fui.text $"Available docks: {portStats.AvailableDocks}"
@@ -48,6 +48,15 @@ let private StatisticsPanel () =
         Fui.text $"Docked vessels: {vesselStats.Docked}"
         Fui.text $"Vessels at sea: {vesselStats.AtSea}"
         Fui.text $"Decommissioned vessels: {vesselStats.Decommissioned}"
+        Html.div [Fui.divider []]
+        Fui.text.subtitle2 "Cargo stats"
+        Fui.text $"Total cargo: {cargoStats.Total}"
+        Fui.text $"In transit cargo: {cargoStats.InTransit}"
+        Fui.text $"Awaiting pickup: {cargoStats.AwaitingPickup}"
+        Fui.text $"Delivered: {cargoStats.Delivered}"
+        Fui.text $"Reserved: {cargoStats.Reserved}"
+        Fui.text $"Loaded on vessel: {cargoStats.LoadedOnVessel}"
+        Fui.text $"Cancelled: {cargoStats.Cancelled}"
       | _ -> Fui.spinner []
     ]
   ]
@@ -137,7 +146,6 @@ let FleetMap () =
                       Html.div [
                         prop.style [
                           style.display.flex
-                          style.backgroundColor.white
                           style.flexDirection.column
                         ]
                         prop.children [
@@ -159,10 +167,20 @@ let FleetMap () =
                           style.padding 0
                         ]
                         button.children [
-                          Fui.text [
-                            text.align.center
-                            text.text $"{port.Name} {port.CurrentDocked}/{port.MaxDocks}"
-                            text.style [style.backgroundColor.white]
+                          Html.div [
+                            prop.style [
+                              style.backgroundColor Theme.tokens.colorBackgroundOverlay
+                              style.color.white
+                            ]
+                            prop.children [
+                              Fui.text [
+                                text.align.center
+                                text.text $"{port.Name} {port.CurrentDocked}/{port.MaxDocks}"
+                              ]
+                              Fui.icon.boxFilled [
+                                icon.primaryFill Theme.tokens.colorPaletteDarkOrangeForeground1
+                              ]
+                            ]
                           ]
                           Fui.icon.locationFilled [
                             icon.style [style.fontSize 34]

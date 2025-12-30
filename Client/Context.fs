@@ -1,6 +1,5 @@
 module Client.Context
 
-open System
 open FS.FluentUI
 open Feliz
 open Shared.Api.Port
@@ -61,6 +60,7 @@ type ContextModel = {
   AllPorts: PortDTO array
   PortStatistics: PortStatistics option
   VesselStatistics: VesselStatistics option
+  CargoStatistics: CargoStatistics option
   SelectedView: SelectedView
   ThemeType: ThemeType
   ToastToUpdate: (ReactElement * IDispatchToastOptionsProp list) option
@@ -75,6 +75,7 @@ type ContextMsg =
   | UpdateSelectedView of SelectedView
   | UpdatePortStatistics of PortStatistics option
   | UpdateVesselStatistics of VesselStatistics option
+  | UpdateCargoStatistics of CargoStatistics option
   | UpdateToast of (ReactElement * IDispatchToastOptionsProp list)
   | DismissToast of string
   | UpdateThemeType of ThemeType
@@ -93,6 +94,7 @@ let UpdateContext (model: ContextModel) (msg: ContextMsg) =
   | UpdateAllPorts ports -> {model with AllPorts = ports}
   | UpdatePortStatistics stats -> {model with PortStatistics = stats}
   | UpdateVesselStatistics stats -> {model with VesselStatistics = stats}
+  | UpdateCargoStatistics stats -> {model with CargoStatistics = stats}
   | UpdateSelectedView vessel -> {model with SelectedView = vessel}
   | UpdateToast toast -> {model with ToastToUpdate = Some toast}
   | DismissToast toastName -> {model with ToastToDismiss = toastName}
@@ -112,6 +114,7 @@ let ContextProvider (children: ReactElement list) =
     AllPorts = [||]
     PortStatistics = None
     VesselStatistics = None
+    CargoStatistics = None
     SelectedView = FleetMap
     ThemeType = Light
     ToastToUpdate = None

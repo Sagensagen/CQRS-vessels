@@ -10,6 +10,7 @@
     <Compile Include="Api\Vessel.fs" />
     <Compile Include="Api\Simulation.fs" />
     <Compile Include="Api\Port.fs" />
+    <Compile Include="Api\Cargo.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -31,6 +31,8 @@ let private unwrapVesselEvent (event: VesselEvent) : obj =
     | VesselDeparted evt -> box evt
     | VesselOperationalStatusUpdated evt -> box evt
     | VesselDecommissioned evt -> box evt
+    | CargoLoaded evt -> box evt
+    | CargoUnloaded evt -> box evt
 
 let private wrapVesselEvent (data: obj) : VesselEvent option =
     match data with
@@ -40,6 +42,8 @@ let private wrapVesselEvent (data: obj) : VesselEvent option =
     | :? VesselDepartedEvt as evt -> Some(VesselDeparted evt)
     | :? VesselOperationalStatusUpdatedEvt as evt -> Some(VesselOperationalStatusUpdated evt)
     | :? VesselDecommissionedEvt as evt -> Some(VesselDecommissioned evt)
+    | :? CargoLoadedEvt as evt -> Some(CargoLoaded evt)
+    | :? CargoUnloadedEvt as evt -> Some(CargoUnloaded evt)
     | _ -> None
 
 /// <summary>

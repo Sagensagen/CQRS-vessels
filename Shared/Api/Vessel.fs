@@ -54,6 +54,8 @@ type RegisterVesselRequest = {
         CrewSize = 0
     }
 
+type CurrentVesselCargo = { CurrentCargoId: Guid; CurrentCargoDestinationPortId: Guid }
+
 type VesselDTO = {
     Id: Guid
     Registered: DateTimeOffset
@@ -68,6 +70,7 @@ type VesselDTO = {
     State: OperationalStatus
     VesselType: VesselType
     CrewSize: int
+    CurrentCargo: CurrentVesselCargo option
     Inserted: DateTimeOffset
 }
 

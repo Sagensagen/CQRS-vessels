@@ -12,7 +12,11 @@ open Serilog
 module Program =
 
     let webApp =
-        choose [ Api.Vessel.vesselHandler; Api.Port.portHandler; Simulation.simulationHandler ]
+        choose
+            [ Api.Vessel.vesselHandler
+              Api.Port.portHandler
+              Api.Cargo.cargoHandler
+              Simulation.simulationHandler ]
 
     [<EntryPoint>]
     let main args =
